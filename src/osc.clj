@@ -11,7 +11,7 @@
 
 (def PAD (byte-array 4))
 
-(defn- osc-now []
+(defn osc-now []
   (System/currentTimeMillis))
 
 ; OSC Data Types:
