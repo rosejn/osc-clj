@@ -271,7 +271,6 @@
       (= true @flag)))
 
 "
-                                  
   [peer path handler & [one-shot]]
   (let [handlers (:handlers peer)
         phandlers (get @handlers path #{})
