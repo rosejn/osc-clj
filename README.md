@@ -52,6 +52,10 @@ the specified timestamp.
 
 ### Project Info:
 
+Include in your project.clj like so:
+
+  [overtone/osc-clj "0.1.2-SNAPSHOT"]
+
 #### Source Repository
 Downloads and the source repository can be found on GitHub:
 
