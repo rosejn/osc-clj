@@ -1,5 +1,5 @@
 (ns osc
-  (:import 
+  (:import
      (java.util.concurrent TimeUnit TimeoutException)
      (java.net InetSocketAddress DatagramSocket DatagramPacket)
      (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
@@ -36,19 +36,19 @@
 ; blob => b
 ;  * An int32 size count, followed by that many 8-bit bytes of arbitrary binary data, followed by 0-3 additional zero bytes to make the total number of bits a multiple of 32.
 ;
-; OSC-timetag 
-;  * 64-bit big-endian fixed-point timestamp 
+; OSC-timetag
+;  * 64-bit big-endian fixed-point timestamp
 
 ; TODO: Figure out how to detect a byte array correctly...
 (defn osc-type-tag [args]
-  (apply str 
+  (apply str
     (map #(instance-case %1
             Integer "i"
             Long    "h"
             Float   "f"
             Double  "d"
             (type PAD) "b" ; This is lame... what is a byte array an instance of?
-            String  "s") 
+            String  "s")
          args)))
 
 (defn osc-msg
@@ -59,7 +59,7 @@
                    type-tag)]
     (with-meta {:path path
                 :type-tag type-tag
-                :args (next args)} 
+                :args (next args)}
                {:type :osc-msg})))
 
 (defn osc-msg? [obj] (= :osc-msg (type obj)))
@@ -72,7 +72,7 @@
 
 (defn osc-bundle? [obj] (= :osc-bundle (type obj)))
 
-(defn- osc-pad 
+(defn- osc-pad
   "Add 0-3 null bytes to make buffer position 32-bit aligned."
   [buf]
   (let [extra (mod (.position buf) 4)]
@@ -99,7 +99,7 @@
   ([buf timestamp]
    (let [secs (+ (/ timestamp 1000) ; secs since Jan. 1, 1970
                  SEVENTY-YEAR-SECS) ; to Jan. 1, 1900
-         fracs (/ (bit-shift-left (long (mod timestamp 1000)) 32) 
+         fracs (/ (bit-shift-left (long (mod timestamp 1000)) 32)
                   1000)
          tag (bit-or (bit-shift-left (long secs) 32) (long fracs))]
      (.putLong buf (long tag)))))
@@ -116,9 +116,10 @@
             \d (.putDouble buf (double arg))
             \b (encode-blob buf arg)
             \s (encode-string buf arg))
-      )))
+      ))
+  buf)
 
-(defn osc-encode-bundle [buf bundle] 
+(defn osc-encode-bundle [buf bundle]
   (encode-string buf "#bundle")
   (encode-timetag buf (:timestamp bundle))
   (doseq [item (:items bundle)]
@@ -134,7 +135,8 @@
       (let [end-pos (.position buf)]
         (.position buf start-pos)
         (.putInt buf (- end-pos start-pos 4))
-        (.position buf end-pos)))))
+        (.position buf end-pos))))
+  buf)
 
 (defn- decode-string [buf]
   (let [start (.position buf)]
@@ -159,8 +161,8 @@
   [buf]
   (let [path (decode-string buf)
         type-tag (decode-string buf)
-        args (reduce (fn [mem t] 
-                       (conj mem 
+        args (reduce (fn [mem t]
+                       (conj mem
                              (case t
                                    \i (.getInt buf)
                                    \h (.getLong buf)
@@ -185,11 +187,11 @@
     (.position buf (- (.position buf) 1))
     (= \# start-char)))
 
-(defn- decode-bundle [buf] 
+(defn- decode-bundle [buf]
   (let [b-tag (decode-string buf)
         timestamp (decode-timetag buf)]))
 
-; TODO: complete implementation of receiving osc bundles 
+; TODO: complete implementation of receiving osc bundles
 ; * We need to recursively go through the bundle and decode either
 ;   sub-bundles or a series of messages.
 (defn osc-decode-packet
@@ -210,26 +212,26 @@
   (throw Exception "Receiving OSC bundles not yet implemented!"))
 
 (defn- handle-msg [listeners* src msg]
-  (let [msg (assoc msg 
-                   :src-host (.getHostName src) 
+  (let [msg (assoc msg
+                   :src-host (.getHostName src)
                    :src-port (.getPort src))]
-    (doseq [listener @listeners*] 
+    (doseq [listener @listeners*]
       (listener msg))))
 
 (defn- listen-loop [chan buf running? listeners*]
   (while @running?
     (try
       (let [[src pkt] (recv-next-packet chan buf)]
-        (cond 
-          (osc-bundle? pkt) (handle-bundle listeners* src pkt) 
+        (cond
+          (osc-bundle? pkt) (handle-bundle listeners* src pkt)
           (osc-msg? pkt)    (handle-msg listeners* src pkt)))
-      (catch AsynchronousCloseException e 
+      (catch AsynchronousCloseException e
         (print-debug "AsynchronousCloseException - running: " @running?) )
-      (catch ClosedChannelException e 
+      (catch ClosedChannelException e
         (print-debug "ClosedChannelException: - running: " @running?)
         (print-debug (.printStackTrace e)))
       (catch Exception e
-        (print-debug "Exception in listen-loop: " e " \nstacktrace: " 
+        (print-debug "Exception in listen-loop: " e " \nstacktrace: "
                    (.printStackTrace e))
         (throw e))))
   (if (.isOpen chan)
@@ -253,7 +255,7 @@
         (handler msg)))))
 
 (defn osc-remove-handler []
-  (dosync (alter *osc-handlers* assoc *current-path* 
+  (dosync (alter *osc-handlers* assoc *current-path*
                  (difference (get @*osc-handlers* *current-path*) #{*current-handler*}))))
 
 (defn osc-handle
@@ -273,7 +275,7 @@
   (let [handlers (:handlers peer)
         phandlers (get @handlers path #{})
         handler (if one-shot
-                  (fn [msg] 
+                  (fn [msg]
                     (handler msg)
                     (osc-remove-handler))
                   handler)]
@@ -282,7 +284,7 @@
 (defn osc-listen
   "Attach a generic listener function that will be called with every incoming osc message."
   [peer listener]
-  (dosync 
+  (dosync
     (alter (:listeners peer) conj listener)))
 
 (defn osc-recv
@@ -294,41 +296,40 @@
   "
   [peer path & [timeout]]
   (let [p (promise)]
-    (osc-handle peer path (fn [msg] 
+    (osc-handle peer path (fn [msg]
                            (deliver p msg)
                             (osc-remove-handler)))
-    (let [res (try 
-                (if timeout 
-                  (.get (future @p) timeout TimeUnit/MILLISECONDS) ; Blocks until 
+    (let [res (try
+                (if timeout
+                  (.get (future @p) timeout TimeUnit/MILLISECONDS) ; Blocks until
                   @p)
-                (catch TimeoutException t 
+                (catch TimeoutException t
                   nil))]
       res)))
 
-;; We use binding to *osc-msg-bundle* to bundle messages 
+;; We use binding to *osc-msg-bundle* to bundle messages
 ;; and send combined with an OSC timestamp.
 (def *osc-msg-bundle* nil)
 
-(defn- chan-send [peer]
-  (let [{:keys [send-buf chan addr]} peer]
+(defn- chan-send [peer send-buf]
+  (let [{:keys [chan addr]} peer]
     (.send chan send-buf @addr)))
 
-(defn- peer-send [peer]
-  (let [send-buf (:send-buf peer)]
-    ; Flip sets limit to current position and resets position to start.
-    (.flip send-buf) 
-    ((:send-fn peer) peer)
-    (.clear send-buf))) ; clear resets everything
+(defn- peer-send [send-buf peer]
+  ; Flip sets limit to current position and resets position to start.
+  (.flip send-buf)
+  ((:send-fn peer) peer send-buf)
+  (.clear send-buf)) ; clear resets everything
 
-(defn osc-send-msg 
+(defn osc-send-msg
   "Send OSC msg to peer."
   [peer msg]
   (if @osc-debug*
     (print-debug "osc-send-msg: " msg))
   (if *osc-msg-bundle*
     (swap! *osc-msg-bundle* #(conj %1 msg))
-    (do
-      (osc-encode-msg (:send-buf peer) msg)
+    (-> (ByteBuffer/allocate BUFFER-SIZE)
+      (osc-encode-msg msg)
       (peer-send peer))))
 
 (defn osc-send-bundle
@@ -336,11 +337,12 @@
   [peer bundle]
   (if @osc-debug*
     (print-debug "osc-send-msg: " bundle))
-  (osc-encode-bundle (:send-buf peer) bundle)
-  (peer-send peer))
+  (-> (ByteBuffer/allocate BUFFER-SIZE)
+    (osc-encode-bundle bundle)
+    (peer-send peer)))
 
-(defn osc-send 
-  "Creates an OSC message and either sends it to the server immediately 
+(defn osc-send
+  "Creates an OSC message and either sends it to the server immediately
   or if a bundle is currently being formed it adds it to the list of messages."
   [client & args]
   (osc-send-msg client (apply osc-msg args)))
@@ -353,7 +355,7 @@
 
 ; OSC peers have listeners and handlers.  A listener is sent every message received, and
 ; handlers are dispatched by OSC node (a.k.a. path).
-  
+
 (defn osc-peer [& [listening?]]
   (let [chan (DatagramChannel/open)
         rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
@@ -372,8 +374,8 @@
      :handlers handlers
      :send-fn chan-send}))
 
-(defn osc-client 
- "Returns an OSC client ready to communicate with a host on a given port.  
+(defn osc-client
+ "Returns an OSC client ready to communicate with a host on a given port.
  Use :protocol in the options map to \"tcp\" if you don't want \"udp\"."
   [host port]
   (let [peer (osc-peer true)
