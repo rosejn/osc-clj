@@ -41,15 +41,16 @@
 
 ; TODO: Figure out how to detect a byte array correctly...
 (defn osc-type-tag [args]
-  (apply str
-    (map #(instance-case %1
-            Integer "i"
-            Long    "h"
-            Float   "f"
-            Double  "d"
-            (type PAD) "b" ; This is lame... what is a byte array an instance of?
-            String  "s")
-         args)))
+  (let [class->char-code (fn [class-name char]
+                          (condp #(instance? %1 %2)
+                              Integer "i"
+                              Long    "h"
+                              Float   "f"
+                              Double  "d"
+                              (type PAD) "b" ; This is lame... what is a byte array an instance of?
+                              String  "s"))
+        tag-chars (map class->char-code args)]
+    (apply str tag-chars)))
 
 (defn osc-msg
   [path & args]
