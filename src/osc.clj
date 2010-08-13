@@ -41,8 +41,8 @@
 
 ; TODO: Figure out how to detect a byte array correctly...
 (defn osc-type-tag [args]
-  (let [class->char-code (fn [class-name char]
-                          (condp #(instance? %1 %2)
+  (let [class->char-code (fn [obj]
+                          (condp #(instance? %1 %2) obj
                               Integer "i"
                               Long    "h"
                               Float   "f"
