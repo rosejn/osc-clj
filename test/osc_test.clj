@@ -11,11 +11,11 @@
 
 (deftest osc-msg-test []
   (let [buf (ByteBuffer/allocate 128)
-        t-args [(make-array Byte/TYPE 20) 
-              42 
-              (float 4.2) 
-              "qwerasdf" 
-              (double 123.23) 
+        t-args [(make-array Byte/TYPE 20)
+              42
+              (float 4.2)
+              "qwerasdf"
+              (double 123.23)
               (long 123412341234)]
         _ (osc-encode-msg buf (apply osc-msg "/asdf" "bifsdh" t-args))
         _ (.position buf 0)
@@ -55,7 +55,7 @@
       (osc-send client "/foo" "i" 42)
       (check-msg (osc-recv server "/foo" 600) "/foo" 42)
       (is (nil? (osc-recv server "/foo" 0)))
-      (finally 
+      (finally
         (osc-close server true)
         (osc-close client true)))))
 
