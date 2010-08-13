@@ -4,7 +4,7 @@
      (java.net InetSocketAddress DatagramSocket DatagramPacket)
      (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
      (java.nio ByteBuffer ByteOrder))
-  (:use clojure.set (clojure.contrib fcase)))
+  (:use clojure.set))
 
 (def OSC-TIMETAG-NOW 1) ; Timetag representing right now.
 (def SEVENTY-YEAR-SECS 2208988800)
