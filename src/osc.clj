@@ -43,12 +43,12 @@
 (defn osc-type-tag [args]
   (let [class->char-code (fn [obj]
                           (condp #(instance? %1 %2) obj
-                              Integer "i"
-                              Long    "h"
-                              Float   "f"
-                              Double  "d"
-                              (type PAD) "b" ; This is lame... what is a byte array an instance of?
-                              String  "s"))
+                            Integer "i"
+                            Long    "h"
+                            Float   "f"
+                            Double  "d"
+                            (type PAD) "b" ; This is lame... what is a byte array an instance of?
+                            String  "s"))
         tag-chars (map class->char-code args)]
     (apply str tag-chars)))
 
