@@ -1,7 +1,6 @@
 (ns osc-test
-  (:use osc-clj
-     clojure.test
-     clojure.contrib.seq-utils)
+  (:use osc
+     clojure.test)
   (:import (java.nio ByteBuffer)))
 
 (def HOST "127.0.0.1")
@@ -32,8 +31,10 @@
         client (osc-client HOST PORT)]
     (osc-close client true)
     (osc-close server true)
-    (is (= false (.isAlive (:thread server))))
-    (is (= false (.isAlive (:thread client))))))
+    (is (= false (.isAlive (:send-thread server))))
+    (is (= false (.isAlive (:listen-thread server))))
+    (is (= false (.isAlive (:send-thread client))))
+    (is (= false (.isAlive (:listen-thread client))))))
 
 (defn check-msg [msg path & args]
   (is (not (nil? msg)))
@@ -52,7 +53,7 @@
       ;(Thread/sleep 200)
       ;(is (= true @flag))
 
-      (osc-send client "/foo" "i" 42)
+      (osc-send client "/foo" 42)
       (check-msg (osc-recv server "/foo" 600) "/foo" 42)
       (is (nil? (osc-recv server "/foo" 0)))
       (finally
