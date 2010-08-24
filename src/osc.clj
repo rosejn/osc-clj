@@ -4,6 +4,8 @@
      (java.net InetSocketAddress DatagramSocket DatagramPacket)
      (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
      (java.nio ByteBuffer ByteOrder))
+  (:use [clojure.set :as set])
+  (:require [clojure.contrib.fcase]))
 
 (def OSC-TIMETAG-NOW 1) ; Timetag representing right now.
 (def SEVENTY-YEAR-SECS 2208988800)
@@ -59,7 +61,7 @@
   "Called from within a handler to remove itself."
   []
   (dosync (alter *osc-handlers* assoc *current-path*
-                 (difference (get @*osc-handlers* *current-path*) #{*current-handler*}))))
+                 (set/difference (get @*osc-handlers* *current-path*) #{*current-handler*}))))
 
 (defn osc-handle
   "Attach a handler function to receive on the specified path.  (Works for both clients and servers.)
@@ -178,9 +180,13 @@
   (.close (:chan peer))
   (when wait
     (if (:listen-thread peer)
-      (.join (:listen-thread peer)))
+      (if (integer? wait)
+        (.join (:listen-thread peer) wait)
+        (.join (:listen-thread peer))))
     (if (:send-thread peer)
-      (.join (:send-thread peer)))))
+      (if (integer? wait)
+        (.join (:send-thread peer) wait)
+        (.join (:send-thread peer))))))
 
 (defn osc-debug
   [& [on-off]]

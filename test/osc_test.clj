@@ -29,8 +29,8 @@
 (deftest thread-lifetime-test []
   (let [server (osc-server PORT)
         client (osc-client HOST PORT)]
-    (osc-close client true)
-    (osc-close server true)
+    (osc-close client 100)
+    (osc-close server 100)
     (is (= false (.isAlive (:send-thread server))))
     (is (= false (.isAlive (:listen-thread server))))
     (is (= false (.isAlive (:send-thread client))))
@@ -44,14 +44,15 @@
       (is (= (nth m-args i) (nth args i))))))
 
 (deftest osc-basic-test []
+  (is (= 1 1))
   (let [server (osc-server PORT)
         client (osc-client HOST PORT)
         flag (atom false)]
     (try
-      ;(osc-handle server "/test" (fn [msg] (reset! flag true)))
-      ;(osc-send client "/test" "i" 42)
-      ;(Thread/sleep 200)
-      ;(is (= true @flag))
+      (osc-handle server "/test" (fn [msg] (reset! flag true)))
+      (osc-send client "/test" "i" 42)
+      (Thread/sleep 200)
+      (is (= true @flag))
 
       (osc-send client "/foo" 42)
       (check-msg (osc-recv server "/foo" 600) "/foo" 42)
@@ -63,3 +64,8 @@
 (defn osc-tests []
   (binding [*test-out* *out*]
     (run-tests 'osc-test)))
+
+(defn test-ns-hook []
+  (osc-msg-test)
+  (thread-lifetime-test)
+  (osc-basic-test))

@@ -5,12 +5,6 @@
 (def BUFFER-SIZE 32768)
 (def PAD (byte-array 4))
 
-(def osc-debug* (ref false))
-
-(defn print-debug [& msgs]
-  (binding [*out* *err*]
-    (apply println msgs)))
-
 (defn- osc-pad
   "Add 0-3 null bytes to make buffer position 32-bit aligned."
   [buf]
@@ -158,23 +152,30 @@
       (listener msg))))
 
 (defn- listen-loop [chan buf running? listeners*]
-  (while @running?
-    (try
-      (let [[src pkt] (recv-next-packet chan buf)]
-        (cond
-          (osc-bundle? pkt) (handle-bundle listeners* src pkt)
-          (osc-msg? pkt)    (handle-msg listeners* src pkt)))
-      (catch AsynchronousCloseException e
-        (print-debug "AsynchronousCloseException - running: " @running?) )
-      (catch ClosedChannelException e
-        (print-debug "ClosedChannelException: - running: " @running?)
-        (print-debug (.printStackTrace e)))
-      (catch Exception e
-        (print-debug "Exception in listen-loop: " e " \nstacktrace: "
-                   (.printStackTrace e))
-        (throw e))))
-  (if (.isOpen chan)
-    (.close chan)))
+  (try
+    (while @running?
+      (try
+        (let [[src pkt] (recv-next-packet chan buf)]
+          (cond
+            (osc-bundle? pkt) (handle-bundle listeners* src pkt)
+            (osc-msg? pkt)    (handle-msg listeners* src pkt)))
+        (catch AsynchronousCloseException e
+          (if @running?
+            (do
+              (print-debug "AsynchronousCloseException in OSC listen-loop...")
+              (print-debug (.printStackTrace e)))))
+        (catch ClosedChannelException e
+          (if @running?
+            (do
+              (print-debug "ClosedChannelException in OSC listen-loop...")
+              (print-debug (.printStackTrace e)))))
+        (catch Exception e
+          (print-debug "Exception in listen-loop: " e " \nstacktrace: "
+                       (.printStackTrace e))
+          (throw e))))
+  (finally
+    (if (.isOpen chan)
+      (.close chan)))))
 
 (defn- listener-thread [chan buf running? listeners*]
   (let [t (Thread. #(listen-loop chan buf running? listeners*))]
@@ -216,7 +217,7 @@
 (defn- osc-type-tag
   [args]
   (apply str
-    (map #(instance-case %1
+    (map #(clojure.contrib.fcase/instance-case %1
             Integer "i"
             Long    "h"
             Float   "f"
@@ -229,17 +230,30 @@
   (let [{:keys [chan addr]} peer]
     (.send chan send-buf @addr)))
 
-(defn- sender-thread [running? send-q send-buf chan]
-  (let [t (Thread.  (fn []
-                      (while @running?
-                        (let [[peer m] (.take send-q)]
-                          (cond
-                            (osc-msg? m) (osc-encode-msg send-buf m)
-                            (osc-bundle? m) (osc-encode-bundle send-buf m))
-                          (.flip send-buf)
-                          ((:send-fn peer) peer send-buf)
-                          (.clear send-buf)) ; clear resets everything
-                               )))]
+(def SEND-LOOP-TIMEOUT 100) ; ms
+
+(defn- send-loop [running? send-q send-buf chan]
+  (while @running?
+    (if-let [res (.poll send-q
+                        SEND-LOOP-TIMEOUT
+                        TimeUnit/MILLISECONDS)]
+      (let [[peer m] res]
+        (cond
+          (osc-msg? m) (osc-encode-msg send-buf m)
+          (osc-bundle? m) (osc-encode-bundle send-buf m))
+        (.flip send-buf)
+        (try
+          ((:send-fn peer) peer send-buf)
+          (catch Exception e
+            (print-debug "Exception in send-loop: " e  "\nstacktrace: "
+                         (.printStackTrace e))
+            (throw e)))
+
+        (.clear send-buf))) ; clear resets everything
+    ))
+
+(defn- sender-thread [& args]
+  (let [t (Thread. #(apply send-loop args))]
     (.start t)
     t))
 
