@@ -264,24 +264,3 @@
 ;    (osc-encode-bundle bundle)
 ;    (peer-send peer)))
 
-(defn- osc-peer [& [listening?]]
-  (let [chan (DatagramChannel/open)
-        rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
-        send-buf (ByteBuffer/allocate BUFFER-SIZE)
-        send-q (PriorityBlockingQueue. OSC-SEND-Q-SIZE (comparator (fn [a b] (< (:timestamp (second a)) (:timestamp (second b))))))
-        running? (ref true)
-        handlers (ref {})
-        listeners (ref #{(msg-handler-dispatcher handlers)})
-        send-thread (sender-thread running? send-q send-buf chan)
-        listen-thread (if listening? (listener-thread chan rcv-buf running? listeners))]
-    (.configureBlocking chan true)
-    {:chan chan
-     :rcv-buf rcv-buf
-     :send-q send-q
-     :running? running?
-     :send-thread send-thread
-     :listen-thread listen-thread
-     :listeners listeners
-     :handlers handlers
-     :send-fn chan-send}))
-

@@ -140,6 +140,26 @@
 
 ; OSC peers have listeners and handlers.  A listener is sent every message received, and
 ; handlers are dispatched by OSC node (a.k.a. path).
+(defn osc-peer [& [listening?]]
+  (let [chan (DatagramChannel/open)
+        rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
+        send-buf (ByteBuffer/allocate BUFFER-SIZE)
+        send-q (PriorityBlockingQueue. OSC-SEND-Q-SIZE (comparator (fn [a b] (< (:timestamp (second a)) (:timestamp (second b))))))
+        running? (ref true)
+        handlers (ref {})
+        listeners (ref #{(msg-handler-dispatcher handlers)})
+        send-thread (sender-thread running? send-q send-buf chan)
+        listen-thread (if listening? (listener-thread chan rcv-buf running? listeners))]
+    (.configureBlocking chan true)
+    {:chan chan
+     :rcv-buf rcv-buf
+     :send-q send-q
+     :running? running?
+     :send-thread send-thread
+     :listen-thread listen-thread
+     :listeners listeners
+     :handlers handlers
+     :send-fn chan-send}))
 
 (defn osc-client
  "Returns an OSC client ready to communicate with a host on a given port.
@@ -175,6 +195,7 @@
            :addr (ref nil))))
 
 (defn osc-close
+  "Close an osc-peer, also works for clients and servers."
   [peer & wait]
   (dosync (ref-set (:running? peer) false))
   (.close (:chan peer))
