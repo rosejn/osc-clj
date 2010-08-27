@@ -47,12 +47,12 @@
   (is (= 1 1))
   (let [server (osc-server PORT)
         client (osc-client HOST PORT)
-        flag (atom false)]
+        counter (atom 0)]
     (try
-      (osc-handle server "/test" (fn [msg] (reset! flag true)))
-      (osc-send client "/test" "i" 42)
-      (Thread/sleep 200)
-      (is (= true @flag))
+      (osc-handle server "/test" (fn [msg] (swap! counter + (first (:args msg)))))
+      (dotimes [i 100] (osc-send client "/test" 1))
+      (Thread/sleep 400)
+      (is (= 100 @counter))
 
       (osc-send client "/foo" 42)
       (check-msg (osc-recv server "/foo" 600) "/foo" 42)

@@ -117,7 +117,7 @@
     (print-debug "osc-send-msg: " msg))
   (if *osc-msg-bundle*
     (swap! *osc-msg-bundle* #(conj %1 msg))
-    (.put (:send-q peer) [peer msg])))
+    (.put (:send-q peer) [peer (assoc msg :timestamp 0)])))
 
 (defn osc-send-bundle
   "Send OSC bundle to peer."

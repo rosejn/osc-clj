@@ -268,7 +268,7 @@
   (let [chan (DatagramChannel/open)
         rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
         send-buf (ByteBuffer/allocate BUFFER-SIZE)
-        send-q (PriorityBlockingQueue. OSC-SEND-Q-SIZE (comparator (fn [a b] (< (:timestamp a) (:timestamp b)))))
+        send-q (PriorityBlockingQueue. OSC-SEND-Q-SIZE (comparator (fn [a b] (< (:timestamp (second a)) (:timestamp (second b))))))
         running? (ref true)
         handlers (ref {})
         listeners (ref #{(msg-handler-dispatcher handlers)})
