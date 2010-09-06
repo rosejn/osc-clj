@@ -264,7 +264,7 @@
 ;    (osc-encode-bundle bundle)
 ;    (peer-send peer)))
 
-(defn- osc-peer [& [listening?]]
+(defn osc-peer [& [listening?]]
   (let [chan (DatagramChannel/open)
         rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
         send-buf (ByteBuffer/allocate BUFFER-SIZE)
