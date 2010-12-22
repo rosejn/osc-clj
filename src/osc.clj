@@ -134,7 +134,7 @@
 
 (defmacro in-osc-bundle [client timestamp & body]
   `(binding [*osc-msg-bundle* (atom [])]
-     (let [res# ~@body]
+     (let [res# (do ~@body)]     
        (osc-send-bundle ~client (osc-bundle ~timestamp @*osc-msg-bundle*))
        res#)))
 
