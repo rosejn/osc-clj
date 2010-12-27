@@ -32,7 +32,7 @@
     (with-meta {:path path
                 :type-tag type-tag
                 :args (next args)}
-               {:type :osc-msg})))
+      {:type :osc-msg})))
 
 (defn osc-msg?
   "Is obj an OSC message?"
@@ -48,6 +48,12 @@
 (defn osc-bundle? [obj] (= :osc-bundle (type obj)))
 
 (load "osc/internals")
+
+; osc-type-tag defined in osc/internals
+(defn osc-msg-infer-types
+  "Returns an OSC message.  Infers the types of the args."
+  [path & args]
+  (apply osc-msg path (osc-type-tag args) args))
 
 (defn osc-listen
   "Attach a generic listener function that will be called with every incoming osc message."
@@ -123,7 +129,7 @@
   "Send OSC bundle to peer."
   [peer bundle]
   (if @osc-debug*
-    (print-debug "osc-send-msg: " bundle))
+    (print-debug "osc-send-bundle: " bundle))
   (.put (:send-q peer) [peer bundle]))
 
 (defn osc-send

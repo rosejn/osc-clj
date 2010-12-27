@@ -30,12 +30,14 @@
 (defn- encode-timetag
   ([buf] (encode-timetag buf (osc-now)))
   ([buf timestamp]
-   (let [secs (+ (/ timestamp 1000) ; secs since Jan. 1, 1970
-                 SEVENTY-YEAR-SECS) ; to Jan. 1, 1900
-         fracs (/ (bit-shift-left (long (mod timestamp 1000)) 32)
-                  1000)
-         tag (bit-or (bit-shift-left (long secs) 32) (long fracs))]
-     (.putLong buf (long tag)))))
+     (if (= timestamp OSC-TIMETAG-NOW)
+       (doto buf (.putInt 0) (.putInt 1))
+       (let [secs (+ (/ timestamp 1000) ; secs since Jan. 1, 1970
+                     SEVENTY-YEAR-SECS) ; to Jan. 1, 1900
+             fracs (/ (bit-shift-left (long (mod timestamp 1000)) 32)
+                      1000)
+             tag (bit-or (bit-shift-left (long secs) 32) (long fracs))]
+         (.putLong buf (long tag))))))
 
 (defn osc-encode-msg [buf msg]
   (let [{:keys [path type-tag args]} msg]
@@ -52,6 +54,8 @@
       ))
   buf)
 
+(declare osc-encode-packet)
+
 (defn osc-encode-bundle [buf bundle]
   (encode-string buf "#bundle")
   (encode-timetag buf (:timestamp bundle))
@@ -62,14 +66,15 @@
     ; size based on the new buffer position.
     (let [start-pos (.position buf)]
       (.putInt buf (int 0))
-      (cond
-        (osc-msg? item) (osc-encode-msg buf item)
-        (osc-bundle? item) (osc-encode-bundle buf item))
+      (osc-encode-packet buf item)
       (let [end-pos (.position buf)]
         (.position buf start-pos)
         (.putInt buf (- end-pos start-pos 4))
         (.position buf end-pos))))
   buf)
+
+(defn osc-encode-packet [buf packet]
+  (if (osc-msg? packet) (osc-encode-msg buf packet) (osc-encode-bundle buf packet)))
 
 (defn- decode-string [buf]
   (let [start (.position buf)]
@@ -107,7 +112,7 @@
                      (rest type-tag))]
     (apply osc-msg path type-tag args)))
 
-(defn- decode-timetag [buf]
+(defn- decode-timetag- [buf]
   (let [tag (.getLong buf)
         secs (- (bit-shift-right tag 32) SEVENTY-YEAR-SECS)
         ms-frac (bit-shift-right (* (bit-and tag (bit-shift-left 0xffffffff 32))
@@ -115,18 +120,37 @@
     (+ (* secs 1000) ; secs as ms
        ms-frac)))
 
+(defn- decode-timetag [buf]
+  (let [tag (.getLong buf)]
+    (if (= tag OSC-TIMETAG-NOW)
+      OSC-TIMETAG-NOW
+      (let [secs (- (bit-shift-right tag 32) SEVENTY-YEAR-SECS)
+            ms-frac (bit-shift-right (* (bit-and tag (bit-shift-left 0xffffffff 32))
+                                        1000) 32)]
+        (+ (* secs 1000)                ; secs as ms
+           ms-frac)))))
+
 (defn- osc-bundle-buf? [buf]
-  (let [start-char (.get buf)]
+  (let [start-char (char (.get buf))]
     (.position buf (- (.position buf) 1))
     (= \# start-char)))
 
-(defn- decode-bundle [buf]
-  (let [b-tag (decode-string buf)
-        timestamp (decode-timetag buf)]))
+(declare osc-decode-packet)
 
-; TODO: complete implementation of receiving osc bundles
-; * We need to recursively go through the bundle and decode either
-;   sub-bundles or a series of messages.
+(defn- decode-bundle-items [buf]
+  (loop [items []]
+    (if (.hasRemaining buf)
+      (let [item-size (.getInt buf)
+            original-limit (.limit buf)
+            item (do (.limit buf (+ (.position buf) item-size)) (osc-decode-packet buf))]
+        (.limit buf original-limit)
+        (recur (conj items item)))
+      items)))
+
+(defn- decode-bundle [buf]
+  (decode-string buf) ; #bundle
+  (osc-bundle (decode-timetag buf) (decode-bundle-items buf)))
+
 (defn osc-decode-packet
   "Decode an OSC packet buffer into a bundle or message map."
   [buf]
@@ -141,15 +165,18 @@
       (.flip buf)
       [src-addr (osc-decode-packet buf)])))
 
-(defn- handle-bundle [listeners* src bundle]
-  (throw Exception "Receiving OSC bundles not yet implemented!"))
-
 (defn- handle-msg [listeners* src msg]
   (let [msg (assoc msg
                    :src-host (.getHostName src)
                    :src-port (.getPort src))]
     (doseq [listener @listeners*]
       (listener msg))))
+
+(defn- handle-bundle [listeners* src bundle]
+  (doseq [item (:items bundle)]
+    (if (osc-msg? item)
+      (handle-msg listeners* src item)
+      (handle-bundle listeners* src item))))
 
 (defn- listen-loop [chan buf running? listeners*]
   (try
