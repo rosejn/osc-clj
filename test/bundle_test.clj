@@ -72,3 +72,22 @@
         (osc-close server true)
         (osc-close client true)))))
 
+(deftest round-trip-bundle-macro []
+  (let [server (osc-server PORT)
+        client (osc-client HOST PORT)
+        args [1 (float 11.0) "round-trip-data"]
+        recv-msg (atom nil)]
+    (try
+      (osc-handle server "/round-trip/data" (fn [msg] (reset! recv-msg msg)))
+      (in-osc-bundle client OSC-TIMETAG-NOW
+                     (osc-send client "/round-trip/begin")
+                     (apply osc-send client "/round-trip/data" args)
+                     (osc-send client "/round-trip/end"))
+      (is (= "/round-trip/end" (:path (osc-recv server "/round-trip/end" 600))))
+      (is (= (count args) (count (:args @recv-msg))))
+      (doseq [pair (map vector args (:args @recv-msg))]
+        (is (= (first pair) (second pair))))
+      (finally
+        (osc-close server true)
+        (osc-close client true)))))
+
