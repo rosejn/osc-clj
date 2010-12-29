@@ -7,6 +7,8 @@
   (:use [clojure.set :as set])
   (:require [clojure.contrib.fcase]))
 
+(def OSC-SEND-Q-SIZE 42)
+
 (def OSC-TIMETAG-NOW 1) ; Timetag representing right now.
 (def SEVENTY-YEAR-SECS 2208988800)
 (def BUFFER-SIZE 32768)
@@ -140,7 +142,7 @@
 
 (defmacro in-osc-bundle [client timestamp & body]
   `(binding [*osc-msg-bundle* (atom [])]
-     (let [res# (do ~@body)]     
+     (let [res# (do ~@body)]
        (osc-send-bundle ~client (osc-bundle ~timestamp @*osc-msg-bundle*))
        res#)))
 

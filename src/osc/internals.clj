@@ -1,10 +1,3 @@
-(def OSC-SEND-Q-SIZE 42)
-
-(def OSC-TIMETAG-NOW 1) ; Timetag representing right now.
-(def SEVENTY-YEAR-SECS 2208988800)
-(def BUFFER-SIZE 32768)
-(def PAD (byte-array 4))
-
 (defn- osc-pad
   "Add 0-3 null bytes to make buffer position 32-bit aligned."
   [buf]
