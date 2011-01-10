@@ -104,8 +104,8 @@
   [peer path & [timeout]]
   (let [p (promise)]
     (osc-handle peer path (fn [msg]
-                           (deliver p msg)
-                            (osc-remove-handler)))
+                            (osc-remove-handler)
+                            (deliver p msg)))
     (let [res (try
                 (if timeout
                   (.get (future @p) timeout TimeUnit/MILLISECONDS) ; Blocks until
