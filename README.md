@@ -74,6 +74,9 @@ For any questions, comments or patches, use the Overtone google group here:
 
 http://groups.google.com/group/overtone
 
-### Authors
+### Author
 
 * Jeff Rose
+
+### Contributors
+* mw10013
