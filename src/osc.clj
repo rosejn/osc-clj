@@ -1,6 +1,6 @@
 (ns osc
   (:import
-     (java.util.concurrent TimeUnit TimeoutException PriorityBlockingQueue)
+     (java.util.concurrent TimeUnit TimeoutException LinkedBlockingQueue)
      (java.net InetSocketAddress DatagramSocket DatagramPacket)
      (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
      (java.nio ByteBuffer ByteOrder))
@@ -152,7 +152,7 @@
   (let [chan (DatagramChannel/open)
         rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
         send-buf (ByteBuffer/allocate BUFFER-SIZE)
-        send-q (PriorityBlockingQueue. OSC-SEND-Q-SIZE (comparator (fn [a b] (< (:timestamp (second a)) (:timestamp (second b))))))
+        send-q (LinkedBlockingQueue.)
         running? (ref true)
         handlers (ref {})
         listeners (ref #{(msg-handler-dispatcher handlers)})
