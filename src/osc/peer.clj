@@ -183,7 +183,7 @@
 (defn register-with-zero-conf
   [peer]
   (let [port @(:port peer)
-        zero-name    (str "Overtone : " port)
+        zero-name    (str (:zero-conf-name peer) " : " port)
         zero-service (ServiceInfo/create "_osc._udp.local" zero-name port "Overtone OSC Server")]
     (.registerService ZERO-CONF zero-service)
     (dosync
@@ -207,9 +207,12 @@
 
 (defn server-peer
   "Returns a live OSC server ready to register handler functions."
-  [port zero-conf?]
+  [port zero-conf-name]
   (let [peer (osc-peer :with-listener)
-        sock (.socket (:chan peer))]
+        sock (.socket (:chan peer))
+        zero-conf? (not (or
+                         (nil? zero-conf-name)
+                         (false? zero-conf-name)))]
 
     (.bind sock (InetSocketAddress. port))
 
@@ -217,6 +220,7 @@
                  :host (ref nil)
                  :port (ref port)
                  :addr (ref nil)
+                 :zero-conf-name zero-conf-name
                  :zero-service (ref nil)
                  :use-zero-conf? zero-conf?)]
       (when zero-conf?

@@ -89,10 +89,11 @@
 
 (defn osc-server
   "Returns a live OSC server ready to register handler functions. By default
-  this also registers the server with zeroconf. However, an optional param
-  can be passed to disable this."
-  ([port] (osc-server port true))
-  ([port use-zero-conf?] (server-peer port use-zero-conf?)))
+  this also registers the server with zeroconf. The name used to register
+  can be passed as an optional param. If the zero-conf-name is set to nil
+  zeroconf wont' be used."
+  ([port] (osc-server port "osc-clj"))
+  ([port zero-conf-name] (server-peer port zero-conf-name)))
 
 (defn osc-close
   "Close an osc-peer, works for both clients and servers. If peer has been
