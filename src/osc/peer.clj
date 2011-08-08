@@ -55,7 +55,11 @@
         listeners        (vals @(:listeners all-listeners))
         default-listener (:default all-listeners)]
     (doseq [listener (conj listeners default-listener)]
-      (listener msg))))
+      (try
+        (listener msg)
+        (catch Exception e
+          (print-debug "Listener Exception. Got msg - " msg "\n"
+                   (with-out-str (.printStackTrace e))))))))
 
 (defn- handle-bundle [all-listeners src bundle]
   (doseq [item (:items bundle)]
@@ -107,7 +111,11 @@
           path       (:path msg)
           path-parts (split-path path)]
       (doseq [[key handler]  (:handlers (get-in hs path-parts {:handlers {}}))]
-        (let [res (handler msg)]
+        (let [res (try
+                    (handler msg)
+                    (catch Exception e
+                      (print-debug "Handler Exception. Got msg - " msg "\n"
+                                   (with-out-str (.printStackTrace e)))))]
           (when (= :done res)
             (remove-handler handlers path key)))))))
 
