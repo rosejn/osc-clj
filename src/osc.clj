@@ -4,7 +4,7 @@
 
 ;; We use binding to *osc-msg-bundle* to bundle messages
 ;; and send combined with an OSC timestamp.
-(def *osc-msg-bundle* nil)
+(def ^{:dynamic true} *osc-msg-bundle* nil)
 
 (defn- osc-send-msg
   "Send OSC msg to peer."
