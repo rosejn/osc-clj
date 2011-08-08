@@ -135,7 +135,7 @@
 
 ; OSC peers have listeners and handlers.  A listener is sent every message received, and
 ; handlers are dispatched by OSC node (a.k.a. path).
-(defn osc-peer [& [listen?]]
+(defn peer [& [listen?]]
   (let [chan (DatagramChannel/open)
         rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
         send-buf (ByteBuffer/allocate BUFFER-SIZE)
@@ -164,7 +164,7 @@
  "Returns an OSC client ready to communicate with a host on a given port.
  Use :protocol in the options map to \"tcp\" if you don't want \"udp\"."
   [host port]
-  (let [peer (osc-peer :with-listener)
+  (let [peer (peer :with-listener)
         sock (.socket (:chan peer))
         local (.getLocalPort sock)]
     (.bind sock (InetSocketAddress. local))
@@ -208,7 +208,7 @@
 (defn server-peer
   "Returns a live OSC server ready to register handler functions."
   [port zero-conf-name]
-  (let [peer (osc-peer :with-listener)
+  (let [peer (peer :with-listener)
         sock (.socket (:chan peer))
         zero-conf? (not (or
                          (nil? zero-conf-name)
@@ -228,7 +228,7 @@
       peer)))
 
 (defn close-peer
-  "Close an osc-peer, also works for clients and servers."
+  "Close a peer, also works for clients and servers."
   [peer & wait]
   (when (:use-zero-conf? peer)
     (unregister-with-zero-conf peer))
@@ -244,32 +244,18 @@
         (.join (:send-thread peer) wait)
         (.join (:send-thread peer))))))
 
-
-;; We use binding to *osc-msg-bundle* to bundle messages
-;; and send combined with an OSC timestamp.
-(def *osc-msg-bundle* nil)
-
-(defn osc-send-msg
-  "Send OSC msg to peer."
-  [peer msg]
-  (if @osc-debug*
-    (print-debug "osc-send-msg: " msg))
-  (if *osc-msg-bundle*
-    (swap! *osc-msg-bundle* #(conj %1 msg))
-    (.put (:send-q peer) [peer (assoc msg :timestamp 0)])))
-
-(defn osc-send-bundle
+(defn peer-send-bundle
   "Send OSC bundle to peer."
   [peer bundle]
-  (if @osc-debug*
+  (when @osc-debug*
     (print-debug "osc-send-bundle: " bundle))
   (.put (:send-q peer) [peer bundle]))
 
-(defmacro in-osc-bundle [client timestamp & body]
-  `(binding [*osc-msg-bundle* (atom [])]
-     (let [res# (do ~@body)]
-       (osc-send-bundle ~client (osc-bundle ~timestamp @*osc-msg-bundle*))
-       res#)))
+(defn peer-send-msg
+  [peer msg]
+  (when @osc-debug*
+    (print-debug "osc-send-msg: " msg))
+  (.put (:send-q peer) [peer (assoc msg :timestamp 0)]))
 
 (defn peer-handle
   [peer path handler key]

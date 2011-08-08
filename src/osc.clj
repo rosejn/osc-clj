@@ -2,6 +2,17 @@
   (:use [osc.util]
         [osc.peer]))
 
+;; We use binding to *osc-msg-bundle* to bundle messages
+;; and send combined with an OSC timestamp.
+(def *osc-msg-bundle* nil)
+
+(defn- osc-send-msg
+  "Send OSC msg to peer."
+  [peer msg]
+  (if *osc-msg-bundle*
+    (swap! *osc-msg-bundle* #(conj %1 msg))
+    (peer-send-msg peer msg)))
+
 (defn osc-listen
   "Attach a generic listener function that will be called with every incoming osc message.
   (osc-listen s (fn [msg] (println \"listener: \" msg)) :foo)"
@@ -75,11 +86,28 @@
   [client path & args]
   (osc-send-msg client (apply osc-msg path (osc-type-tag args) args)))
 
+(defn osc-send-bundle
+  "Send OSC bundle to peer."
+  [peer bundle]
+  (peer-send-bundle peer bundle))
+
+(defmacro in-osc-bundle [client timestamp & body]
+  `(binding [*osc-msg-bundle* (atom [])]
+     (let [res# (do ~@body)]
+       (osc-send-bundle ~client (osc-bundle ~timestamp @*osc-msg-bundle*))
+       res#)))
+
 (defn osc-client
  "Returns an OSC client ready to communicate with a host on a given port.
  Use :protocol in the options map to \"tcp\" if you don't want \"udp\"."
   [host port]
   (client-peer host port))
+
+(defn osc-peer
+  "Returns a generic OSC peer. You will need to configure it to make
+  it act either as a server or client."
+  []
+  (peer))
 
 (defn osc-target
   "Update the target address of an OSC client so future calls to osc-send
