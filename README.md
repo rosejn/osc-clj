@@ -13,24 +13,27 @@ The library implements both a client and a server.  Check out the tests for
 additional examples and read the source.
 
     (use 'osc)
-    
+
     (def PORT 4242)
-    
+
     ; start a server and create a client to talk with it
-    (def server (osc-server PORT)) 
+    (def server (osc-server PORT))
     (def client (osc-client "localhost" PORT))
-    
+
     ; Register a handler function for the /test OSC address
     ; The handler takes a message map with the following keys:
     ;   {:src-host, :src-port, :path, :type-tag, :args}
-    (osc-handle server "/test" (fn [msg] (println "MSG: " (:args msg))))
-    
+    (osc-handle server "/test" (fn [msg] (println "MSG: " (:args msg))) :my-handler)
+
     ; send it some messages
     (doseq [val (range 10)]
      (osc-send client "/test" "i" val))
-    
+
     (Thread/sleep 1000)
-    
+
+    ;remove handler
+    (osc-rm-handler server "/test" :my-handler)
+
     ; stop listening and deallocate resources
     (osc-close client)
     (osc-close server)
@@ -45,9 +48,13 @@ the specified timestamp.
     ; 1 second from now.
     (in-osc-bundle client (+ (osc-now) 1000)
       (osc-send client "/foo" "i" 42)
-      
+
       ; Call functions that send more osc messages
       (do-stuff client))
+
+### TODO
+
+osc-clj doesn't yet implement receiving timestamped OSC bundles or pattern matching incoming OSC message paths against registered method handlers.
 
 
 ### Project Info:
@@ -59,13 +66,12 @@ Include in your project.clj like so:
 #### Source Repository
 Downloads and the source repository can be found on GitHub:
 
-  http://github.com/rosejn/osc-clj
+  http://github.com/overtone/osc-clj
 
-Eventually there will be more documentation for this library, but in the
-meantime you can see it in use within the context of Project Overtone, located
-here:
+Eventually there will be more documentation for this library. In the
+meantime we recommend you take a look at fns in the osc namespace and also see the library in use within the context of Project Overtone, located here:
 
-  http://github.com/rosejn/overtone
+  http://github.com/overtone/overtone
 
 
 #### Mailing List
@@ -80,3 +86,4 @@ http://groups.google.com/group/overtone
 
 ### Contributors
 * mw10013
+* Sam Aaron
