@@ -263,6 +263,8 @@
     (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " ILLEGAL-METHOD-CHARS))))
   (when (.endsWith path "/")
     (throw (IllegalArgumentException. (str "OSC handle needs a method name (i.e. must not end with /)"))))
+  (when-not (.startsWith path "/")
+    (throw (IllegalArgumentException. (str "OSC handle needs to start with /"))))
   (let [handlers (:handlers peer)
         path-parts (split-path path)
 
