@@ -134,7 +134,19 @@
   (let [on-off (if (= on-off false) false true)]
     (dosync (ref-set osc-debug* on-off))))
 
-(defn osc-remove-zero-conf
-  "Unregister any zeroconf services registered in this session"
+(defn zero-conf-on
+  "Turn zeroconf on. Will automatically register all running servers with their
+  specified service names (defaulting to \"osc-clj\" if none was specified)."
   []
-  (peer-unregister-all-zero-conf-services))
+  (turn-zero-conf-on))
+
+(defn zero-conf-off
+  "Turn zeroconf off. Will unregister all registered services and close zeroconf
+  down."
+  []
+  (turn-zero-conf-off))
+
+(defn zero-conf?
+  "Returns true if zeroconf is running, false otherwise."
+  []
+  (zero-conf-running?))

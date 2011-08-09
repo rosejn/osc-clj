@@ -10,15 +10,62 @@
         [osc.decode :only [osc-decode-packet]]
         [osc.encode :only [osc-encode-msg osc-encode-bundle]]))
 
+(def zero-conf* (agent nil))
+(def zero-conf-services* (atom {}))
 
-(defonce ZERO-CONF (JmDNS/create))
-
-(defn peer-unregister-all-zero-conf-services
-  "Unregister all services registered with zeroconf"
+(defn turn-zero-conf-on
+  "Turn zeroconf on and register all services in zero-conf-services* if any."
   []
-  (.unregisterAllServices ZERO-CONF))
+  (send zero-conf* (fn [zero-conf]
+                     (if zero-conf
+                       zero-conf
+                       (let [zero-conf (JmDNS/create)]
+                         (doseq [service (vals @zero-conf-services*)]
+                           (.registerService zero-conf service))
+                         zero-conf))))
+  :zero-conf-on)
 
-(defonce __clean-slate__ (peer-unregister-all-zero-conf-services))
+(defn turn-zero-conf-off
+  "Unregister all zeroconf services and close zeroconf down."
+  []
+  (send zero-conf* (fn [zero-conf]
+                     (when zero-conf
+                       (.unregisterAllServices zero-conf)
+                       (.close zero-conf))
+                     nil))
+  :zero-conf-off)
+
+(defn unregister-zero-conf-service
+  "Unregister zeroconf service registered with port."
+  [port]
+  (send zero-conf* (fn [zero-conf port]
+                     (swap! zero-conf-services* dissoc port)
+                     (let [service (get @zero-conf-services* port)]
+                       (when (and zero-conf zero-conf)
+                         (.unregisterService zero-conf service)))
+                     zero-conf)
+        port))
+
+(defn register-zero-conf-service
+  "Register zeroconf service with name service-name and port."
+  [service-name port]
+  (send zero-conf* (fn [zero-conf service-name port]
+                     (let [service-name (str service-name " : " port)
+                           service (ServiceInfo/create "_osc._udp.local"
+                                                       service-name port
+                                                       (str "Clojure OSC Server"))]
+                       (swap! zero-conf-services* assoc port service)
+                       (when zero-conf
+                         (.registerService zero-conf service))
+                       zero-conf))
+        service-name
+        port))
+
+(defn zero-conf-running?
+  []
+  (if @zero-conf*
+    true
+    false))
 
 (defn- recv-next-packet
   "Fills buf with the contents of the next packet and then decodes it into an
@@ -211,69 +258,44 @@
            :port (ref port)
            :addr (ref (InetSocketAddress. host port)))))
 
-(defn unregister-with-zero-conf
-  "Unregister a peer's :zero-service from zeroconf"
-  [peer]
-  (when-let [zero-service @(:zero-service peer)]
-    (.unregisterService ZERO-CONF zero-service)
-    (dosync
-     (ref-set (:zero-service peer) nil))))
-
-(defn register-with-zero-conf
-  "Register a peer's with zeroconf using the peer's :zero-conf-name and port as
-  the identifier. Stores the created zeroconf info object in the peer's ref
-  :zero-service."
-  [peer]
-  (let [port @(:port peer)
-        zero-name    (str (:zero-conf-name peer) " : " port)
-        zero-service (ServiceInfo/create "_osc._udp.local" zero-name port "Overtone OSC Server")]
-    (.registerService ZERO-CONF zero-service)
-    (dosync
-     (ref-set (:zero-service peer) zero-service))))
-
 (defn update-peer-target
   "Update the target address of an OSC client so future calls to osc-send
   will go to a new destination. Also updates zeroconf registration."
   [peer host port]
 
-  (when (:use-zero-conf? peer)
-    (unregister-with-zero-conf peer))
+  (when (:zero-conf-name peer)
+    (unregister-zero-conf-service (:port peer)))
 
   (dosync
     (ref-set (:host peer) host)
     (ref-set (:port peer) port)
     (ref-set (:addr peer) (InetSocketAddress. host port)))
 
-  (when (:use-zero-conf? peer)
-    (register-with-zero-conf peer)))
+  (when (:zero-conf-name peer)
+    (register-zero-conf-service (:zero-conf-name peer) port)))
 
 (defn server-peer
   "Returns a live OSC server ready to register handler functions."
   [port zero-conf-name]
   (let [peer (peer :with-listener)
-        sock (.socket (:chan peer))
-        zero-conf? (not (or
-                         (nil? zero-conf-name)
-                         (false? zero-conf-name)))]
+        sock (.socket (:chan peer))]
 
     (.bind sock (InetSocketAddress. port))
+    (register-zero-conf-service zero-conf-name port)
 
     (let [peer (assoc peer
                  :host (ref nil)
                  :port (ref port)
                  :addr (ref nil)
-                 :zero-conf-name zero-conf-name
-                 :zero-service (ref nil)
-                 :use-zero-conf? zero-conf?)]
-      (when zero-conf?
-        (register-with-zero-conf peer))
+                 :zero-conf-name zero-conf-name)]
+
       peer)))
 
 (defn close-peer
   "Close a peer, also works for clients and servers."
   [peer & wait]
-  (when (:use-zero-conf? peer)
-    (unregister-with-zero-conf peer))
+  (when (:zero-conf-name peer)
+    (unregister-zero-conf-service (:port peer)))
   (dosync (ref-set (:running? peer) false))
   (.close (:chan peer))
   (when wait
