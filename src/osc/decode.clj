@@ -6,7 +6,10 @@
   [buf]
   (.position buf (bit-and (bit-not 3) (+ 3 (.position buf)))))
 
-(defn- decode-string [buf]
+(defn- decode-string
+  "Decode string from current pos in buf. OSC strings are terminated by a null
+  char."
+  [buf]
   (let [start (.position buf)]
     (while (not (zero? (.get buf))) nil)
     (let [end (.position buf)
@@ -17,7 +20,10 @@
       (osc-align buf)
       (String. str-buf 0 (dec len)))))
 
-(defn- decode-blob [buf]
+(defn- decode-blob
+  "Decode binary blob from current pos in buf. Size of blob is determined by the
+  first int found in buffer."
+  [buf]
   (let [size (.getInt buf)
         blob (byte-array size)]
     (.get buf blob 0 size)
@@ -42,7 +48,9 @@
                      (rest type-tag))]
     (apply osc-msg path type-tag args)))
 
-(defn- decode-timetag [buf]
+(defn- decode-timetag
+  "Decode OSC timetag from current pos in buf."
+  [buf]
   (let [tag (.getLong buf)]
     (if (= tag OSC-TIMETAG-NOW)
       OSC-TIMETAG-NOW
@@ -52,14 +60,18 @@
         (+ (* secs 1000)                ; secs as ms
            ms-frac)))))
 
-(defn- osc-bundle-buf? [buf]
+(defn- osc-bundle-buf?
+  "Check whether there is an osc bundle at the current position in buf."
+  [buf]
   (let [start-char (char (.get buf))]
     (.position buf (- (.position buf) 1))
     (= \# start-char)))
 
 (declare osc-decode-packet)
 
-(defn- decode-bundle-items [buf]
+(defn- decode-bundle-items
+  "Pull out all the message packets within bundle from current buf position."
+  [buf]
   (loop [items []]
     (if (.hasRemaining buf)
       (let [item-size (.getInt buf)
@@ -69,7 +81,9 @@
         (recur (conj items item)))
       items)))
 
-(defn- decode-bundle [buf]
+(defn- decode-bundle
+  "Decode a bundle - ignore the first string as it simply identifies the bundle."
+  [buf]
   (decode-string buf) ; #bundle
   (osc-bundle (decode-timetag buf) (decode-bundle-items buf)))
 

@@ -14,13 +14,16 @@
 (defonce ZERO-CONF (JmDNS/create))
 
 (defn peer-unregister-all-zero-conf-services
+  "Unregister all services registered with zeroconf"
   []
   (.unregisterAllServices ZERO-CONF))
 
 (defonce __clean-slate__ (peer-unregister-all-zero-conf-services))
 
 (defn- recv-next-packet
-  "blocks on .receive if nothing to receive"
+  "Fills buf with the contents of the next packet and then decodes it into an
+  OSC message map. Returns a vec of the source address of the packet and the
+  message map itself. Blocks current thread if nothing to receive."
   [chan buf]
   (.clear buf)
   (let [src-addr (.receive chan buf)]
@@ -28,7 +31,12 @@
       (.flip buf)
       [src-addr (osc-decode-packet buf)])))
 
-(defn- send-loop [running? send-q send-buf chan]
+(defn- send-loop
+  "Loop for the send thread to execute in order to send OSC messages externally.
+  Reads messages from send-q, encodes them using send-buf and sends them out
+  using the peer's send-fn extracted from send-q (send-q is expected to contain a
+  sequence of [peer message]). "
+  [running? send-q send-buf]
   (while @running?
     (if-let [res (.poll send-q
                         SEND-LOOP-TIMEOUT
@@ -48,7 +56,13 @@
         (.clear send-buf))) ; clear resets everything
     ))
 
-(defn- handle-msg [all-listeners src msg]
+(defn- handle-msg
+  "Send msg to all listeners. all-liseners is a map containing the keys
+  :listeners (a ref of all user-registered listeners which may resolve to the
+  empty list) and :default (the default listener). Each listener is then
+  extracted and called with the message as a param. Before invoking the
+  listeners the source host and port are added to the  message map."
+  [all-listeners src msg]
   (let [msg              (assoc msg
                            :src-host (.getHostName src)
                            :src-port (.getPort src))
@@ -61,13 +75,20 @@
           (print-debug "Listener Exception. Got msg - " msg "\n"
                    (with-out-str (.printStackTrace e))))))))
 
-(defn- handle-bundle [all-listeners src bundle]
+(defn- handle-bundle
+  "Extract all :items in the bundle and either handle the message if a normal
+  OSC message, or handle bundle recursively."
+  [all-listeners src bundle]
   (doseq [item (:items bundle)]
     (if (osc-msg? item)
       (handle-msg all-listeners src item)
       (handle-bundle all-listeners src item))))
 
-(defn- listen-loop [chan buf running? all-listeners]
+(defn- listen-loop
+  "Loop for the listen thread to execute in order to receive and handle OSC
+  messages. Recieves packets from chan using buf and then handles them either
+  as messages or bundles - passing the source information and message itself."
+  [chan buf running? all-listeners]
   (try
     (while @running?
       (try
@@ -119,23 +140,41 @@
           (when (= :done res)
             (remove-handler handlers path key)))))))
 
-(defn- listener-thread [chan buf running? all-listeners]
+(defn- listener-thread
+  "Thread which runs the listen-loop"
+  [chan buf running? all-listeners]
   (let [t (Thread. #(listen-loop chan buf running? all-listeners))]
     (.start t)
     t))
 
-(defn- sender-thread [& args]
+(defn- sender-thread
+  "Thread which runs the send-loop"
+  [& args]
   (let [t (Thread. #(apply send-loop args))]
     (.start t)
     t))
 
-(defn- chan-send [peer send-buf]
+(defn- chan-send
+  "Standard :send-fn for a peer. Sends contents of send-buf out to the peer's
+  :chan to the the address associated with the peer's ref :addr. :addr is typically
+  added to a peer on creation. See client-peer and server-peer."
+  [peer send-buf]
   (let [{:keys [chan addr]} peer]
     (.send chan send-buf @addr)))
 
-; OSC peers have listeners and handlers.  A listener is sent every message received, and
-; handlers are dispatched by OSC node (a.k.a. path).
-(defn peer [& [listen?]]
+(defn peer
+  "Creat a generic peer which is capable of both sending and receiving messages
+  on DatagramChannel :chan. Creates a thread for sending packets out using the
+  fn in :send-fn (defaults to chan-send). Creates a thread for sending packets
+  out by spawning a sending thread which will pull OSC message maps from the
+  :send-q, encode them to binary and send them using the fn in :send-fn
+  (defaults to chan-send).
+
+  If passed an optional param listen? will also start a thread listening for
+  incoming packets on chan. peers have listeners and handlers registered to
+  recieve incoming messages.  A listener is sent every message received, and
+  handlers are dispatched by OSC node (a.k.a. path)."
+  [& [listen?]]
   (let [chan (DatagramChannel/open)
         rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
         send-buf (ByteBuffer/allocate BUFFER-SIZE)
@@ -144,7 +183,7 @@
         handlers (ref {})
         default-listener (mk-default-listener handlers)
         listeners (ref {})
-        send-thread (sender-thread running? send-q send-buf chan)
+        send-thread (sender-thread running? send-q send-buf)
         listen-thread (when listen?
                         (listener-thread chan rcv-buf running? {:listeners listeners
                                                                 :default default-listener}))]
@@ -161,8 +200,7 @@
      :send-fn chan-send}))
 
 (defn client-peer
- "Returns an OSC client ready to communicate with a host on a given port.
- Use :protocol in the options map to \"tcp\" if you don't want \"udp\"."
+ "Returns an OSC client ready to communicate with a host on a given port."
   [host port]
   (let [peer (peer :with-listener)
         sock (.socket (:chan peer))
@@ -174,6 +212,7 @@
            :addr (ref (InetSocketAddress. host port)))))
 
 (defn unregister-with-zero-conf
+  "Unregister a peer's :zero-service from zeroconf"
   [peer]
   (when-let [zero-service @(:zero-service peer)]
     (.unregisterService ZERO-CONF zero-service)
@@ -181,6 +220,9 @@
      (ref-set (:zero-service peer) nil))))
 
 (defn register-with-zero-conf
+  "Register a peer's with zeroconf using the peer's :zero-conf-name and port as
+  the identifier. Stores the created zeroconf info object in the peer's ref
+  :zero-service."
   [peer]
   (let [port @(:port peer)
         zero-name    (str (:zero-conf-name peer) " : " port)
@@ -191,7 +233,7 @@
 
 (defn update-peer-target
   "Update the target address of an OSC client so future calls to osc-send
-  will go to a new destination."
+  will go to a new destination. Also updates zeroconf registration."
   [peer host port]
 
   (when (:use-zero-conf? peer)
@@ -252,12 +294,14 @@
   (.put (:send-q peer) [peer bundle]))
 
 (defn peer-send-msg
+  "Send OSC msg to peer"
   [peer msg]
   (when @osc-debug*
     (print-debug "osc-send-msg: " msg))
   (.put (:send-q peer) [peer (assoc msg :timestamp 0)]))
 
 (defn peer-handle
+  "Register a new handler with peer on path with key."
   [peer path handler key]
   (when (contains-illegal-chars? path)
     (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " ILLEGAL-METHOD-CHARS))))
@@ -272,6 +316,8 @@
     (dosync (alter handlers assoc-in (conj (vec path-parts) :handlers) (assoc phandlers key handler)))))
 
 (defn peer-recv
+  "Register a one-shot handler with peer with specified timeout. If timeout is
+  nil then timeout is ignored."
   [peer path timeout]
   (let [p (promise)]
     (peer-handle peer path (fn [msg]
@@ -286,6 +332,7 @@
       res)))
 
 (defn peer-rm-handlers
+  "Remove handlers from peer associated with path."
   [peer path]
   (let [handlers (:handlers peer)
         path-parts (split-path path)]
@@ -293,7 +340,7 @@
      (alter handlers assoc-in (conj (vec path-parts) :handlers) {}))))
 
 (defn peer-rm-all-handlers
-  "remove all handlers recursively down from path"
+  "Remove all handlers from peer recursively down from path"
   ([peer path]
      (let [handlers (:handlers peer)
            path-parts (split-path path)]
@@ -303,7 +350,7 @@
           (alter  handlers path-parts {}))))))
 
 (defn peer-rm-handler
-  "remove handler with specific key associated with path"
+  "Remove handler from peer with specific key associated with path"
   [peer path key]
   (let [handlers (:handlers peer)]
     (remove-handler handlers path key)))

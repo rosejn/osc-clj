@@ -2,23 +2,28 @@
   (use [osc.util]))
 
 (defn osc-pad
-  "Add 0-3 null bytes to make buffer position 32-bit aligned."
+  "Add 0-3 null bytes to make buf position 32-bit aligned."
   [buf]
   (let [extra (mod (.position buf) 4)]
     (if (pos? extra)
       (.put buf PAD 0 (- 4 extra)))))
 
-(defn encode-string [buf s]
+(defn encode-string
+  "Encode string s into buf. Ensures buffer is correctly padded."
+  [buf s]
   (.put buf (.getBytes s))
   (.put buf (byte 0))
   (osc-pad buf))
 
-(defn encode-blob [buf b]
+(defn encode-blob
+  "Encode binary blob b into buf. Ensures buffer is correctly padded."
+  [buf b]
   (.putInt buf (count b))
   (.put buf b)
   (osc-pad buf))
 
 (defn encode-timetag
+  "Encode timetag into buf. Timestamp defaults now if not specifically passed."
   ([buf] (encode-timetag buf (osc-now)))
   ([buf timestamp]
      (if (= timestamp OSC-TIMETAG-NOW)
@@ -30,7 +35,9 @@
              tag (bit-or (bit-shift-left (long secs) 32) (long fracs))]
          (.putLong buf (long tag))))))
 
-(defn osc-encode-msg [buf msg]
+(defn osc-encode-msg
+  "Encode OSC message msg into buf."
+  [buf msg]
   (let [{:keys [path type-tag args]} msg]
     (encode-string buf path)
     (encode-string buf (str "," type-tag))
@@ -47,7 +54,9 @@
 
 (declare osc-encode-packet)
 
-(defn osc-encode-bundle [buf bundle]
+(defn osc-encode-bundle
+  "Encode bundle into buf."
+  [buf bundle]
   (encode-string buf "#bundle")
   (encode-timetag buf (:timestamp bundle))
   (doseq [item (:items bundle)]
@@ -64,5 +73,7 @@
         (.position buf end-pos))))
   buf)
 
-(defn osc-encode-packet [buf packet]
+(defn osc-encode-packet
+  "Encode OSC packet into buf. Handles both OSC messages and bundles."
+  [buf packet]
   (if (osc-msg? packet) (osc-encode-msg buf packet) (osc-encode-bundle buf packet)))
