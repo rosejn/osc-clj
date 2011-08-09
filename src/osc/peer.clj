@@ -248,7 +248,11 @@
 
 (defn client-peer
  "Returns an OSC client ready to communicate with a host on a given port."
-  [host port]
+ [host port]
+ (when-not (integer? port)
+   (throw (Exception. (str "port should be an integer - got: " port))))
+ (when-not (string? host)
+   (throw (Exception. (str "host should be a string - got:" host))))
   (let [peer (peer :with-listener)
         sock (.socket (:chan peer))
         local (.getLocalPort sock)]
@@ -277,6 +281,10 @@
 (defn server-peer
   "Returns a live OSC server ready to register handler functions."
   [port zero-conf-name]
+  (when-not (integer? port)
+    (throw (Exception. (str "port should be an integer - got: " port))))
+  (when-not (string? zero-conf-name)
+    (throw (Exception. (str "zero-conf-name should be a string - got:" zero-conf-name))))
   (let [peer (peer :with-listener)
         sock (.socket (:chan peer))]
 
@@ -325,6 +333,8 @@
 (defn peer-handle
   "Register a new handler with peer on path with key."
   [peer path handler key]
+  (when-not (string? path)
+    (throw (IllegalArgumentException. (str "OSC handle path should be a string"))))
   (when (contains-illegal-chars? path)
     (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " ILLEGAL-METHOD-CHARS))))
   (when (.endsWith path "/")
