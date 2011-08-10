@@ -38,11 +38,7 @@ additional examples and read the source.
     (osc-close client)
     (osc-close server)
 
-There is support for sending timestamped OSC bundles, (receiving them hasn't
-been implemented yet),  which is how you can get sample accurate messaging for
-use with SuperCollider and other OSC servers.  All OSC messages and bundles sent
-within the scope of a bundle will get sent together in the parent bundle with
-the specified timestamp.
+There is support for sending and recieving timestamped OSC bundles, which is how you can get sample accurate messaging for use with SuperCollider and other OSC servers.  All OSC messages and bundles sent within the scope of a bundle will get sent together in the parent bundle with the specified timestamp.
 
     ; Send the enclosing messages inside a bundle that is timestamped for
     ; 1 second from now.
