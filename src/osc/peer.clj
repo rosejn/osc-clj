@@ -5,6 +5,7 @@
    (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
    (java.nio ByteBuffer)
    (javax.jmdns JmDNS ServiceListener ServiceInfo))
+  (:require [at-at :as at-at])
   (:use [clojure.set :as set]
         [osc.util]
         [osc.decode :only [osc-decode-packet]]
@@ -124,12 +125,14 @@
 
 (defn- handle-bundle
   "Extract all :items in the bundle and either handle the message if a normal
-  OSC message, or handle bundle recursively."
+  OSC message, or handle bundle recursively. Schedule the bundle to be handled
+  according to its timestamp."
   [all-listeners src bundle]
-  (doseq [item (:items bundle)]
-    (if (osc-msg? item)
-      (handle-msg all-listeners src item)
-      (handle-bundle all-listeners src item))))
+  (at-at/at (:timestamp bundle)
+            #(doseq [item (:items bundle)]
+               (if (osc-msg? item)
+                 (handle-msg all-listeners src item)
+                 (handle-bundle all-listeners src item)))))
 
 (defn- listen-loop
   "Loop for the listen thread to execute in order to receive and handle OSC

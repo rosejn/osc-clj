@@ -10,7 +10,6 @@
 (def SEND-LOOP-TIMEOUT 100) ; ms
 (def OSC-SEND-Q-SIZE 42)
 (def OSC-TIMETAG-NOW 1) ; Timetag representing right now.
-(def SEVENTY-YEAR-SECS 2208988800)
 (def BUFFER-SIZE 32768)
 (def PAD (byte-array 4))
 (def ILLEGAL-METHOD-CHARS [" " "#" "*" "," "?" "[" "]" "{" "}"])
@@ -18,9 +17,6 @@
 (defn contains-illegal-chars?
   "Returns true if str contains any illegal characters"
   [str] (some #(.contains str %) ILLEGAL-METHOD-CHARS))
-
-(defn osc-now []
-  (System/currentTimeMillis))
 
 ; TODO: Figure out how to detect a byte array correctly...
 (defn osc-type-tag

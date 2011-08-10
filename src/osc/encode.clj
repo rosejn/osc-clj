@@ -1,4 +1,5 @@
 (ns osc.encode
+  (:import [org.apache.commons.net.ntp TimeStamp])
   (use [osc.util]))
 
 (defn osc-pad
@@ -24,16 +25,13 @@
 
 (defn encode-timetag
   "Encode timetag into buf. Timestamp defaults now if not specifically passed."
-  ([buf] (encode-timetag buf (osc-now)))
+  ([buf] (encode-timetag buf OSC-TIMETAG-NOW))
   ([buf timestamp]
      (if (= timestamp OSC-TIMETAG-NOW)
        (doto buf (.putInt 0) (.putInt 1))
-       (let [secs (+ (/ timestamp 1000) ; secs since Jan. 1, 1970
-                     SEVENTY-YEAR-SECS) ; to Jan. 1, 1900
-             fracs (/ (bit-shift-left (long (mod timestamp 1000)) 32)
-                      1000)
-             tag (bit-or (bit-shift-left (long secs) 32) (long fracs))]
-         (.putLong buf (long tag))))))
+       (let [ntp-timestamp (TimeStamp/getNtpTime (long timestamp))
+             ntp-long      (.ntpValue ntp-timestamp)]
+         (.putLong buf ntp-long)))))
 
 (defn osc-encode-msg
   "Encode OSC message msg into buf."

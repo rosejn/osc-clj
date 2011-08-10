@@ -1,4 +1,5 @@
 (ns osc.decode
+  (:import [org.apache.commons.net.ntp TimeStamp])
   (:use [osc.util]))
 
 (defn osc-align
@@ -54,11 +55,7 @@
   (let [tag (.getLong buf)]
     (if (= tag OSC-TIMETAG-NOW)
       OSC-TIMETAG-NOW
-      (let [secs (- (bit-shift-right tag 32) SEVENTY-YEAR-SECS)
-            ms-frac (bit-shift-right (* (bit-and tag (bit-shift-left 0xffffffff 32))
-                                        1000) 32)]
-        (+ (* secs 1000)                ; secs as ms
-           ms-frac)))))
+      (TimeStamp/getTime tag))))
 
 (defn- osc-bundle-buf?
   "Check whether there is an osc bundle at the current position in buf."

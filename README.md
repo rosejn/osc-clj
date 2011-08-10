@@ -54,7 +54,7 @@ the specified timestamp.
 
 ### TODO
 
-osc-clj doesn't yet implement receiving timestamped OSC bundles or pattern matching incoming OSC message paths against registered method handlers.
+osc-clj doesn't yet implement pattern matching incoming OSC message paths against registered method handlers.
 
 
 ### Project Info:

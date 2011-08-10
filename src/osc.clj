@@ -151,3 +151,8 @@
   "Returns true if zeroconf is running, false otherwise."
   []
   (zero-conf-running?))
+
+(defn osc-now
+  "Return the current time in milliseconds"
+  []
+  (System/currentTimeMillis))
