@@ -9,7 +9,8 @@
   (:use [clojure.set :as set]
         [osc.util]
         [osc.decode :only [osc-decode-packet]]
-        [osc.encode :only [osc-encode-msg osc-encode-bundle]]))
+        [osc.encode :only [osc-encode-msg osc-encode-bundle]]
+        [osc.pattern :only [matching-handlers]]))
 
 (def zero-conf* (agent nil))
 (def zero-conf-services* (atom {}))
@@ -105,7 +106,7 @@
     ))
 
 (defn- handle-msg
-  "Send msg to all listeners. all-liseners is a map containing the keys
+  "Send msg to all listeners. all-listeners is a map containing the keys
   :listeners (a ref of all user-registered listeners which may resolve to the
   empty list) and :default (the default listener). Each listener is then
   extracted and called with the message as a param. Before invoking the
@@ -171,16 +172,14 @@
         phandlers   (:handlers (get-in @handlers path-parts {:handlers {}}))]
     (dosync (alter handlers assoc-in path-parts {:handlers (dissoc phandlers key)}))))
 
-;;TODO  This needs to grab *more* handlers depending on the wildcards in the incoming msg
 (defn- mk-default-listener
   "Return a fn which dispatches the passed in message to all specified handlers with
   a matching path."
   [handlers]
   (fn [msg]
-    (let [hs         @handlers
-          path       (:path msg)
-          path-parts (split-path path)]
-      (doseq [[key handler]  (:handlers (get-in hs path-parts {:handlers {}}))]
+    (let [path (:path msg)
+          hs (matching-handlers path @handlers)]
+      (doseq [[path key handler] hs]
         (let [res (try
                     (handler msg)
                     (catch Exception e
@@ -337,8 +336,8 @@
   [peer path handler key]
   (when-not (string? path)
     (throw (IllegalArgumentException. (str "OSC handle path should be a string"))))
-  (when (contains-illegal-chars? path)
-    (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " ILLEGAL-METHOD-CHARS))))
+  (when (contains-pattern-match-chars? path)
+    (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " PATTERN-MATCH-CHARS))))
   (when (.endsWith path "/")
     (throw (IllegalArgumentException. (str "OSC handle needs a method name (i.e. must not end with /)"))))
   (when-not (.startsWith path "/")

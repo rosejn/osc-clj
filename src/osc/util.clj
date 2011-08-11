@@ -12,11 +12,11 @@
 (def OSC-TIMETAG-NOW 1) ; Timetag representing right now.
 (def BUFFER-SIZE 32768)
 (def PAD (byte-array 4))
-(def ILLEGAL-METHOD-CHARS [" " "#" "*" "," "?" "[" "]" "{" "}"])
+(def PATTERN-MATCH-CHARS [" " "#" "*" "," "?" "[" "]" "{" "}"])
 
-(defn contains-illegal-chars?
-  "Returns true if str contains any illegal characters"
-  [str] (some #(.contains str %) ILLEGAL-METHOD-CHARS))
+(defn contains-pattern-match-chars?
+  "Returns true if str contains any pattern-match characters"
+  [str] (some #(.contains str %) PATTERN-MATCH-CHARS))
 
 ; TODO: Figure out how to detect a byte array correctly...
 (defn osc-type-tag
