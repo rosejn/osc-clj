@@ -158,8 +158,7 @@
               (print-debug (.printStackTrace e)))))
         (catch Exception e
           (print-debug "Exception in listen-loop: " e " \nstacktrace: "
-                       (.printStackTrace e))
-          (throw e))))
+                       (.printStackTrace e)))))
   (finally
     (if (.isOpen chan)
       (.close chan)))))
