@@ -123,12 +123,16 @@
     (drop (count match) part)
     []))
 
-;;TODO Implement me (if actually needed)
 (defn- until-word-match
   "returns the number of chars up to the first char of the first word match. If
   more than one word matches - choose the smallest number to drop (non-greedy)"
   [pattern part]
-  0)
+  (let [word-matches (extract-match-strings pattern)
+        str-matches (map #(apply str %) word-matches)
+        str-part (apply str part)
+        sliced (map #(string/split str-part (re-pattern %)) str-matches)
+        counted (map #(count (first %)) sliced)]
+    (first (sort counted))))
 
 (defn- until-neg-char-match
   "returns the number of chars up to the first neg char match"
@@ -142,13 +146,6 @@
   (let [char-matches (extract-pos-char-matcher pattern)]
     (count (take-while #(not (some #{%} char-matches)) part))))
 
-;;TODO Implement me (if actually needed)
-(defn- until-non-question-match
-  "returns the number of chars up to the first non-question match (minus num
-  consecutive question marks"
-  [pattern part]
-  0)
-
 (defn- drop-matched-star-chars
   "Drops chars in part up to the next known match in pattern. Returns remaining
   chars in part. If remaining chars list is empty then there's no match.
@@ -161,8 +158,6 @@
 
         (and (= \[ (first pattern))
              (not= \! (second pattern)))  (drop (until-pos-char-match pattern part) part)
-
-        (= \? (first pattern)) (drop (until-non-question-match pattern part) part)
 
         (= \{ (first pattern)) (drop (until-word-match pattern part) part)
    :else  (drop-while #(not (some #{%} (valid-next-chars pattern))) part)))
@@ -245,10 +240,13 @@
 (defn- normalize-pattern
   "manipulate pattern to simplify strange match-char sequences
   ab*******c => ab*c
-  ab*??*c => \"ab*??c"
+  ab*??*?*c => \"ab???*c"
   [pattern-str]
   (let [pattern-str (string/replace pattern-str #"\*+" "*")
-        pattern-str (string/replace pattern-str #"(\*[?]+)\*+" #(str (second %)))]
+        pattern-str (string/replace pattern-str #"\*[*?]+" (fn [m]
+                                                             (let [str-a (seq m)
+                                                                   num (count (filter #(= \? %) str-a))]
+                                                               (apply str (conj (vec (repeat num "?")) "*") ))))]
     pattern-str))
 
 (defn- path-part-matches?
