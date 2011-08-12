@@ -331,28 +331,36 @@
     (print-debug "osc-send-msg: " msg))
   (.put (:send-q peer) [peer (assoc msg :timestamp 0)]))
 
+(defn- normalize-path
+  "Clean up path.
+  /foo//bar/baz -> /foo/bar/baz"
+  [path]
+  (string/replace path #"/{2,}" "/"))
+
 (defn peer-handle
   "Register a new handler with peer on path with key."
   [peer path handler key]
-  (when-not (string? path)
-    (throw (IllegalArgumentException. (str "OSC handle path should be a string"))))
-  (when (contains-pattern-match-chars? path)
-    (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " PATTERN-MATCH-CHARS))))
-  (when (.endsWith path "/")
-    (throw (IllegalArgumentException. (str "OSC handle needs a method name (i.e. must not end with /)"))))
-  (when-not (.startsWith path "/")
-    (throw (IllegalArgumentException. (str "OSC handle needs to start with /"))))
-  (let [handlers (:handlers peer)
-        path-parts (split-path path)
+  (let [path (normalize-path path)]
+    (when-not (string? path)
+      (throw (IllegalArgumentException. (str "OSC handle path should be a string"))))
+    (when (contains-pattern-match-chars? path)
+      (throw (IllegalArgumentException. (str "OSC handle paths may not contain the following chars: " PATTERN-MATCH-CHARS))))
+    (when (.endsWith path "/")
+      (throw (IllegalArgumentException. (str "OSC handle needs a method name (i.e. must not end with /)"))))
+    (when-not (.startsWith path "/")
+      (throw (IllegalArgumentException. (str "OSC handle needs to start with /"))))
+    (let [handlers (:handlers peer)
+          path-parts (split-path path)
 
-        phandlers (:handlers (get-in @handlers path-parts {:handlers {}}))]
-    (dosync (alter handlers assoc-in (conj (vec path-parts) :handlers) (assoc phandlers key handler)))))
+          phandlers (:handlers (get-in @handlers path-parts {:handlers {}}))]
+      (dosync (alter handlers assoc-in (conj (vec path-parts) :handlers) (assoc phandlers key handler))))))
 
 (defn peer-recv
   "Register a one-shot handler with peer with specified timeout. If timeout is
   nil then timeout is ignored."
   [peer path timeout]
-  (let [p (promise)]
+  (let [path (normalize-path path)
+        p (promise)]
     (peer-handle peer path (fn [msg]
                             (deliver p msg)
                             :done))
@@ -367,23 +375,26 @@
 (defn peer-rm-handlers
   "Remove handlers from peer associated with path."
   [peer path]
-  (let [handlers (:handlers peer)
+  (let [path (normalize-path path)
+        handlers (:handlers peer)
         path-parts (split-path path)]
     (dosync
      (alter handlers assoc-in (conj (vec path-parts) :handlers) {}))))
 
 (defn peer-rm-all-handlers
   "Remove all handlers from peer recursively down from path"
-  ([peer path]
-     (let [handlers (:handlers peer)
-           path-parts (split-path path)]
-       (dosync
-        (if (empty? path-parts)
-          (ref-set handlers {})
-          (alter  handlers path-parts {}))))))
+  [peer path]
+  (let [path (normalize-path path)
+        handlers (:handlers peer)
+        path-parts (split-path path)]
+    (dosync
+     (if (empty? path-parts)
+       (ref-set handlers {})
+       (alter  handlers path-parts {})))))
 
 (defn peer-rm-handler
   "Remove handler from peer with specific key associated with path"
   [peer path key]
-  (let [handlers (:handlers peer)]
+  (let [path (normalize-path path)
+        handlers (:handlers peer)]
     (remove-handler handlers path key)))
