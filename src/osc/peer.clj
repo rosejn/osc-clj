@@ -5,7 +5,8 @@
    (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
    (java.nio ByteBuffer)
    (javax.jmdns JmDNS ServiceListener ServiceInfo))
-  (:require [at-at :as at-at])
+  (:require [at-at :as at-at]
+            [clojure.string :as string])
   (:use [clojure.set :as set]
         [osc.util]
         [osc.decode :only [osc-decode-packet]]
@@ -216,7 +217,10 @@
   fn in :send-fn (defaults to chan-send). Creates a thread for sending packets
   out by spawning a sending thread which will pull OSC message maps from the
   :send-q, encode them to binary and send them using the fn in :send-fn
-  (defaults to chan-send).
+  (defaults to chan-send). For chan-send to work, the chan's socked needs to be
+  bound (see peer-client). Allowing chan-send to be modified allows for
+  libraries such as Overtone to not actually transmit OSC packets out over the
+  channel, but to send them via a different transport mechanism.
 
   If passed an optional param listen? will also start a thread listening for
   incoming packets on chan. peers have listeners and handlers registered to
@@ -236,32 +240,59 @@
                         (listener-thread chan rcv-buf running? {:listeners listeners
                                                                 :default default-listener}))]
     (.configureBlocking chan true)
-    {:chan chan
-     :rcv-buf rcv-buf
-     :send-q send-q
-     :running? running?
-     :send-thread send-thread
-     :listen-thread listen-thread
-     :default-listener default-listener
-     :listeners listeners
-     :handlers handlers
-     :send-fn chan-send}))
+    (with-meta
+      {:chan chan
+       :rcv-buf rcv-buf
+       :send-q send-q
+       :running? running?
+       :send-thread send-thread
+       :listen-thread listen-thread
+       :default-listener default-listener
+       :listeners listeners
+       :handlers handlers
+       :send-fn chan-send}
+      {:type ::peer})))
+
+(defn- num-listeners
+  "Returns the number of listeners in a peer"
+  [peer]
+  (count (keys @(:listeners peer))))
+
+(defn- num-handlers
+  "Returns the number of handlers in a peer"
+  ([peer] (num-handlers peer @(:handlers peer)))
+  ([peer sub-tree]
+     (let [sub-names (remove #(= % :handlers) (keys sub-tree))
+           num-hs (count (:handlers sub-tree))]
+       (+ num-hs (reduce (fn [sum sub-name]
+                           (+ sum (num-handlers peer (get sub-tree sub-name))))
+                         0
+                         sub-names)))))
+
+(defmethod print-method ::peer [peer w]
+  (.write w (format "#<osc-peer: open?[%s] listening?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (if (:listen-thread peer) true false) (num-listeners peer) (num-handlers peer))))
 
 (defn client-peer
- "Returns an OSC client ready to communicate with a host on a given port."
+  "Returns an OSC client ready to communicate with a host on a given port.
+  Client doesn't listen."
  [host port]
  (when-not (integer? port)
    (throw (Exception. (str "port should be an integer - got: " port))))
  (when-not (string? host)
    (throw (Exception. (str "host should be a string - got:" host))))
-  (let [peer (peer :with-listener)
+  (let [peer (peer)
         sock (.socket (:chan peer))
         local (.getLocalPort sock)]
     (.bind sock (InetSocketAddress. local))
-    (assoc peer
+    (with-meta
+      (assoc peer
            :host (ref host)
            :port (ref port)
-           :addr (ref (InetSocketAddress. host port)))))
+           :addr (ref (InetSocketAddress. host port)))
+      {:type ::client})))
+
+(defmethod print-method ::client [peer w]
+  (.write w (format "#<osc-client: open?[%s] dest-host[%s] des-port[%s]>" @(:running? peer)  @(:host peer) @(:port peer))))
 
 (defn update-peer-target
   "Update the target address of an OSC client so future calls to osc-send
@@ -292,13 +323,16 @@
     (.bind sock (InetSocketAddress. port))
     (register-zero-conf-service zero-conf-name port)
 
-    (let [peer (assoc peer
+    (with-meta
+      (assoc peer
                  :host (ref nil)
                  :port (ref port)
                  :addr (ref nil)
-                 :zero-conf-name zero-conf-name)]
+                 :zero-conf-name zero-conf-name)
+      {:type ::server})))
 
-      peer)))
+(defmethod print-method ::peer [peer w]
+  (.write w (format "#<osc-server: open?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (if (:listen-thread peer) true false) (num-listeners peer) (num-handlers peer))))
 
 (defn close-peer
   "Close a peer, also works for clients and servers."
