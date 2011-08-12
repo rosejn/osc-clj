@@ -280,16 +280,17 @@
    (throw (Exception. (str "port should be an integer - got: " port))))
  (when-not (string? host)
    (throw (Exception. (str "host should be a string - got:" host))))
-  (let [peer (peer)
-        sock (.socket (:chan peer))
-        local (.getLocalPort sock)]
-    (.bind sock (InetSocketAddress. local))
-    (with-meta
-      (assoc peer
-           :host (ref host)
-           :port (ref port)
-           :addr (ref (InetSocketAddress. host port)))
-      {:type ::client})))
+ (let [host  (string/trim host)
+       peer  (peer)
+       sock  (.socket (:chan peer))
+       local (.getLocalPort sock)]
+   (.bind sock (InetSocketAddress. local))
+   (with-meta
+     (assoc peer
+       :host (ref host)
+       :port (ref port)
+       :addr (ref (InetSocketAddress. host port)))
+     {:type ::client})))
 
 (defmethod print-method ::client [peer w]
   (.write w (format "#<osc-client: open?[%s] dest-host[%s] des-port[%s]>" @(:running? peer)  @(:host peer) @(:port peer))))
@@ -298,17 +299,21 @@
   "Update the target address of an OSC client so future calls to osc-send
   will go to a new destination. Also updates zeroconf registration."
   [peer host port]
+  (when-not (integer? port)
+    (throw (Exception. (str "port should be an integer - got: " port))))
+  (when-not (string? host)
+    (throw (Exception. (str "host should be a string - got:" host))))
+  (let [host (string/trim host)]
+    (when (:zero-conf-name peer)
+      (unregister-zero-conf-service (:port peer)))
 
-  (when (:zero-conf-name peer)
-    (unregister-zero-conf-service (:port peer)))
+    (dosync
+     (ref-set (:host peer) host)
+     (ref-set (:port peer) port)
+     (ref-set (:addr peer) (InetSocketAddress. host port)))
 
-  (dosync
-    (ref-set (:host peer) host)
-    (ref-set (:port peer) port)
-    (ref-set (:addr peer) (InetSocketAddress. host port)))
-
-  (when (:zero-conf-name peer)
-    (register-zero-conf-service (:zero-conf-name peer) port)))
+    (when (:zero-conf-name peer)
+      (register-zero-conf-service (:zero-conf-name peer) port))))
 
 (defn server-peer
   "Returns a live OSC server ready to register handler functions."
@@ -369,7 +374,9 @@
   "Clean up path.
   /foo//bar/baz -> /foo/bar/baz"
   [path]
-  (string/replace path #"/{2,}" "/"))
+  (let [path (string/trim path)
+        path (string/replace path #"/{2,}" "/")]
+    path))
 
 (defn peer-handle
   "Register a new handler with peer on path with key."
