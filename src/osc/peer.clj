@@ -331,8 +331,8 @@
                  :zero-conf-name zero-conf-name)
       {:type ::server})))
 
-(defmethod print-method ::peer [peer w]
-  (.write w (format "#<osc-server: open?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (if (:listen-thread peer) true false) (num-listeners peer) (num-handlers peer))))
+(defmethod print-method ::server [peer w]
+  (.write w (format "#<osc-server: open?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (num-listeners peer) (num-handlers peer))))
 
 (defn close-peer
   "Close a peer, also works for clients and servers."
