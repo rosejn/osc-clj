@@ -100,8 +100,7 @@
           ((:send-fn peer) peer send-buf)
           (catch Exception e
             (print-debug "Exception in send-loop: " e  "\nstacktrace: "
-                         (.printStackTrace e))
-            (throw e)))
+                         (.printStackTrace e))))
 
         (.clear send-buf))) ; clear resets everything
     ))
