@@ -47,7 +47,7 @@
                                    \s (decode-string buf))))
                      []
                      (rest type-tag))]
-    (apply osc-msg path type-tag args)))
+    (apply mk-osc-msg path type-tag args)))
 
 (defn- decode-timetag
   "Decode OSC timetag from current pos in buf."
@@ -82,7 +82,7 @@
   "Decode a bundle - ignore the first string as it simply identifies the bundle."
   [buf]
   (decode-string buf) ; #bundle
-  (osc-bundle (decode-timetag buf) (decode-bundle-items buf)))
+  (mk-osc-bundle (decode-timetag buf) (decode-bundle-items buf)))
 
 (defn osc-decode-packet
   "Decode an OSC packet buffer into a bundle or message map."

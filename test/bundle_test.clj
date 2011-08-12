@@ -31,25 +31,25 @@
     (compare-packets packet (osc-decode-packet buf))))
 
 (deftest encode-decode-empty []
-         (encode-decode-compare (osc-bundle OSC-TIMETAG-NOW [])))
+         (encode-decode-compare (mk-osc-bundle OSC-TIMETAG-NOW [])))
 
 (deftest encode-decode-one []
-         (encode-decode-compare (osc-bundle OSC-TIMETAG-NOW
+         (encode-decode-compare (mk-osc-bundle OSC-TIMETAG-NOW
                                             [(osc-msg-infer-types "/encode-decode-one"
                                                                    1 (float 11.0) "encode-decode--one")])))
 
 (deftest encode-decode-two []
-         (encode-decode-compare (osc-bundle OSC-TIMETAG-NOW
+         (encode-decode-compare (mk-osc-bundle OSC-TIMETAG-NOW
                                             [(osc-msg-infer-types "/encode-decode-two"
                                                                    1 (float 11.0) "encode-decode-two")
                                              (osc-msg-infer-types "/encode-decode-two"
                                                                    2 (float 22.0) "encode-decode-two")])))
 
 (deftest encode-decode-nested []
-         (encode-decode-compare (osc-bundle OSC-TIMETAG-NOW
+         (encode-decode-compare (mk-osc-bundle OSC-TIMETAG-NOW
                                             [(osc-msg-infer-types "/encode-decode"
                                                                    1 (float 11.0) "encode-decode")
-                                             (osc-bundle OSC-TIMETAG-NOW
+                                             (mk-osc-bundle OSC-TIMETAG-NOW
                                                          [(osc-msg-infer-types "/encode-decode-nested"
                                                                                11 (float 111.0) "encode-decode-nested")])
                                              (osc-msg-infer-types "/encode-decode"
@@ -58,7 +58,7 @@
 (deftest round-trip []
   (let [server (osc-server PORT)
         client (osc-client HOST PORT)
-        bundle (osc-bundle OSC-TIMETAG-NOW
+        bundle (mk-osc-bundle OSC-TIMETAG-NOW
                            [(osc-msg-infer-types "/round-trip/begin")
                             (osc-msg-infer-types "/round-trip/data" 1 (float 11.0) "round-trip-data")
                             (osc-msg-infer-types "/round-trip/end")])
@@ -90,4 +90,3 @@
       (finally
         (osc-close server true)
         (osc-close client true)))))
-

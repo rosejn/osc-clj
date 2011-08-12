@@ -62,8 +62,8 @@
               args)))
 
 
-(defn osc-msg
-  "Returns a map representing an OSC message.
+(defn mk-osc-msg
+  "Create an OSC message
 
   An OSC message consists of:
   * a path prefixed with /
@@ -85,17 +85,17 @@
   [path]
   (rest (str/split path #"/")))
 
-(defn osc-msg?
-  "Returns true if obj is an OSC message"
-  [obj]
-  (= :osc-msg (type obj)))
-
-(defn osc-bundle
-  "Returns an OSC bundle, which is a timestamped set of OSC messages and/or bundles."
+(defn mk-osc-bundle
+  "Create an osc bundle"
   [timestamp items]
   (with-meta {:timestamp timestamp
               :items items}
              {:type :osc-bundle}))
+
+(defn osc-msg?
+  "Returns true if obj is an OSC message"
+  [obj]
+  (= :osc-msg (type obj)))
 
 (defn osc-bundle?
   "Returns true if obj is an OSC Bundle"
@@ -106,4 +106,4 @@
 (defn osc-msg-infer-types
   "Returns an OSC message.  Infers the types of the args."
   [path & args]
-  (apply osc-msg path (osc-type-tag args) args))
+  (apply mk-osc-msg path (osc-type-tag args) args))
