@@ -14,19 +14,16 @@
     (peer-send-msg peer msg)))
 
 (defn osc-listen
-  "Attach a generic listener function that will be called with every incoming osc message.
-  (osc-listen s (fn [msg] (println \"listener: \" msg)) :foo)"
-  [server listener key]
-  (dosync
-   (alter (:listeners server) assoc key listener))
-  server)
+  "Attach a generic listener function that will be called with every incoming
+  osc message. An optional key allows you to specifically refer to this listener
+  at a later point in time
 
-(defn osc-rm-listener
-  "Remove the generic listener associated with the specific key
-  (osc-rm-listener s :foo)"
-  [server key]
-  (dosync
-   (alter (:listeners server) dissoc key)))
+  (osc-listen s (fn [msg] (println \"listener: \" msg)) :foo)."
+  ([server listener] (osc-listen server listener listener))
+  ([server listener key]
+     (dosync
+      (alter (:listeners server) assoc key listener))
+     server))
 
 (defn osc-listeners
   "Return a seq of all registered listeners
@@ -34,11 +31,20 @@
   [server]
   (keys @(:listeners server)))
 
+(defn osc-rm-listener
+  "Remove the generic listener associated with the specific key
+  (osc-rm-listener s :foo)"
+  [server key]
+  (dosync
+   (alter (:listeners server) dissoc key))
+  server)
+
 (defn osc-rm-all-listeners
   "Remove all generic listeners associated with server"
   [server]
   (dosync
-   (ref-set (:listeners server) {})))
+   (ref-set (:listeners server) {}))
+  server)
 
 (defn osc-handle
   "Add a handle fn to an OSC path with the specified key. This handle will be
@@ -57,12 +63,14 @@
   "Remove the handler at path with the specified key. This just removes one
   specific handler (if found)"
   [server path key]
-  (peer-rm-handler server path key))
+  (peer-rm-handler server path key)
+  server)
 
 (defn osc-rm-handlers
   "Remove all the handlers at path."
   [server path]
-  (peer-rm-handlers server path))
+  (peer-rm-handlers server path)
+  server)
 
 (defn osc-rm-all-handlers
   "Remove all registered handlers for the supplied path (defaulting to /)
@@ -72,7 +80,9 @@
   osc-rm-all-handlers is called with /foo/bar, then all handlers associated
   with both /foo/bar and /foo/bar/baz will be removed."
   ([server] (osc-rm-all-handlers server "/"))
-  ([server path] (peer-rm-all-handlers server path)))
+  ([server path]
+     (peer-rm-all-handlers server path)
+     server))
 
 (defn osc-recv
   "Register a one-shot handler which will remove itself once called. If a
@@ -80,7 +90,8 @@
   is not received within timeout milliseconds. Otherwise, it will block
   the current thread until a message has been received."
   [server path & [timeout]]
-  (peer-recv server path timeout))
+  (peer-recv server path timeout)
+  server)
 
 (defn osc-send
   "Creates an OSC message and either sends it to the server immediately
@@ -129,7 +140,8 @@
   "Update the target address of an OSC client so future calls to osc-send
   will go to a new destination. Automatically updates zeroconf if necessary."
   [client host port]
-  (update-peer-target client host port))
+  (update-peer-target client host port)
+  client)
 
 (defn osc-server
   "Returns a live OSC server ready to register handler functions. By default
@@ -143,7 +155,8 @@
   "Close an osc-peer, works for both clients and servers. If peer has been
   registered with zeroconf, it will automatically remove it."
   [peer & wait]
-  (apply close-peer peer wait))
+  (apply close-peer peer wait)
+  peer)
 
 (defn osc-debug
   [& [on-off]]
