@@ -292,7 +292,7 @@
      {:type ::client})))
 
 (defmethod print-method ::client [peer w]
-  (.write w (format "#<osc-client: open?[%s] dest-host[%s] des-port[%s]>" @(:running? peer)  @(:host peer) @(:port peer))))
+  (.write w (format "#<osc-client: dest-host[%s] des-port[%s] open?[%s]>"  @(:host peer) @(:port peer) @(:running? peer))))
 
 (defn update-peer-target
   "Update the target address of an OSC client so future calls to osc-send
@@ -336,7 +336,7 @@
       {:type ::server})))
 
 (defmethod print-method ::server [peer w]
-  (.write w (format "#<osc-server: open?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (num-listeners peer) (num-handlers peer))))
+  (.write w (format "#<osc-server: n-listeners[%s] n-handlers[%s] open?[%s]>" (num-listeners peer) (num-handlers peer) @(:running? peer))))
 
 (defn close-peer
   "Close a peer, also works for clients and servers."
