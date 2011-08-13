@@ -61,6 +61,25 @@
         (osc-close server true)
         (osc-close client true)))))
 
+(deftest osc-slowpoke-server-test []
+  (let [server (osc-server PORT)
+        client (osc-client HOST PORT)
+        coll (atom [])
+        end 50
+        end-millis (+ (System/currentTimeMillis) (* end 1000 1/5))]
+    (try
+      (osc-handle server "/test" (fn [msg] (swap! coll (fn [s]
+                                                        (Thread/sleep 100)
+                                                        (conj s (first (:args msg)))))))
+      (dotimes [i end] (osc-send client "/test" i))
+      (while (or (not= (count @coll) end) (< (System/currentTimeMillis) end-millis))
+        (Thread/sleep 250))
+      (dorun (map-indexed #(is (= %1 %2)) @coll))
+      (finally
+        (osc-close server true)
+        (osc-close client true)))))
+
+
 (defn osc-tests []
   (binding [*test-out* *out*]
     (run-tests 'osc-test)))
@@ -68,4 +87,5 @@
 (defn test-ns-hook []
   (osc-msg-test)
   (thread-lifetime-test)
-  (osc-basic-test))
+  (osc-basic-test)
+  (osc-slowpoke-server-test))
