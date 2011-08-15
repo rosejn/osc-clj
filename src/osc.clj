@@ -47,37 +47,32 @@
   server)
 
 (defn osc-handle
-  "Add a handle fn to an OSC path with the specified key. This handle will be
-  called when an incoming OSC message matches the supplied path. This may either
-  be a direct match, or a pattern match if the incoming OSC message uses wild
-  card chars in its path (Pattern matching not implemented yet).
+  "Add a handle fn (a method in OSC parlance) to the specified OSC path
+  (container). This handle will be called when an incoming OSC message matches
+  the supplied path. This may either be a direct match, or a pattern match if
+  the incoming OSC message uses wild card chars in its path.  The path you
+  specify may not contain any of the OSC reserved chars:
+  # * , ? [ ] { } and whitespace
 
-  The path you specify may not contain any of the OSC reserved chars:
-  # * , ? [ ] { } and whitespace"
-  ([server path handler] (osc-handle server path handler handler))
-  ([server path handler key]
-     (peer-handle server path handler key)
-     server))
-
-(defn osc-rm-handler
-  "Remove the handler at path with the specified key. This just removes one
-  specific handler (if found)"
-  [server path key]
-  (peer-rm-handler server path key)
+  Will override and remove any handler already associated with the supplied
+  path. If the handler-fn returns :done it will automatically remove itself."
+  [server path handler]
+  (peer-handle server path handler)
   server)
 
-(defn osc-rm-handlers
-  "Remove all the handlers at path."
+(defn osc-rm-handler
+  "Remove the handler at the specified path.
+  specific handler (if found)"
   [server path]
-  (peer-rm-handlers server path)
+  (peer-rm-handler server path)
   server)
 
 (defn osc-rm-all-handlers
   "Remove all registered handlers for the supplied path (defaulting to /)
-  This not only removes the handlers associated with the specified path
+  This not only removes the handler associated with the specified path
   but also all handlers further down in the path tree. i.e. if handlers
   have been registered for both /foo/bar and /foo/bar/baz and
-  osc-rm-all-handlers is called with /foo/bar, then all handlers associated
+  osc-rm-all-handlers is called with /foo/bar, then the handlers associated
   with both /foo/bar and /foo/bar/baz will be removed."
   ([server] (osc-rm-all-handlers server "/"))
   ([server path]
@@ -88,9 +83,12 @@
   "Register a one-shot handler which will remove itself once called. If a
   timeout is specified, it will return nil if a message matching the path
   is not received within timeout milliseconds. Otherwise, it will block
-  the current thread until a message has been received."
-  [server path & [timeout]]
-  (peer-recv server path timeout)
+  the current thread until a message has been received.
+
+  Will override and remove any handler already associated with the supplied
+  path."
+  [server path handler & [timeout]]
+  (peer-recv server path handler timeout)
   server)
 
 (defn osc-send

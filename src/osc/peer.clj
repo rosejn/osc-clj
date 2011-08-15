@@ -105,7 +105,7 @@
         (.clear send-buf))) ; clear resets everything
     ))
 
-(defn- handle-msg
+(defn- dispatch-msg
   "Send msg to all listeners. all-listeners is a map containing the keys
   :listeners (a ref of all user-registered listeners which may resolve to the
   empty list) and :default (the default listener). Each listener is then
@@ -124,7 +124,7 @@
           (print-debug "Listener Exception. Got msg - " msg "\n"
                    (with-out-str (.printStackTrace e))))))))
 
-(defn- handle-bundle
+(defn- dispatch-bundle
   "Extract all :items in the bundle and either handle the message if a normal
   OSC message, or handle bundle recursively. Schedule the bundle to be handled
   according to its timestamp."
@@ -132,8 +132,8 @@
   (at-at/at (:timestamp bundle)
             #(doseq [item (:items bundle)]
                (if (osc-msg? item)
-                 (handle-msg all-listeners src item)
-                 (handle-bundle all-listeners src item)))))
+                 (dispatch-msg all-listeners src item)
+                 (dispatch-bundle all-listeners src item)))))
 
 (defn- listen-loop
   "Loop for the listen thread to execute in order to receive and handle OSC
@@ -145,8 +145,8 @@
       (try
         (let [[src pkt] (recv-next-packet chan buf)]
           (cond
-            (osc-bundle? pkt) (handle-bundle all-listeners src pkt)
-            (osc-msg? pkt)    (handle-msg all-listeners src pkt)))
+            (osc-bundle? pkt) (dispatch-bundle all-listeners src pkt)
+            (osc-msg? pkt)    (dispatch-msg all-listeners src pkt)))
         (catch AsynchronousCloseException e
           (if @running?
             (do
@@ -165,12 +165,13 @@
       (.close chan)))))
 
 (defn- remove-handler
-  "Remove the supplied handler from the specified path within handlers. If no
-  key is passed, key defaults to the handler object itself."
-  [handlers path key]
+  "Remove the handler associated with the specified path within the ref
+  handlers."
+  [handlers path]
   (let [path-parts (split-path path)
-        phandlers   (:handlers (get-in @handlers path-parts {:handlers {}}))]
-    (dosync (alter handlers assoc-in path-parts {:handlers (dissoc phandlers key)}))))
+        path-parts (concat path-parts [:handler])]
+    (dosync
+     (alter handlers assoc-in path-parts {}))))
 
 (defn- mk-default-listener
   "Return a fn which dispatches the passed in message to all specified handlers with
@@ -179,14 +180,14 @@
   (fn [msg]
     (let [path (:path msg)
           hs (matching-handlers path @handlers)]
-      (doseq [[path key handler] hs]
+      (doseq [[path handler] hs]
         (let [res (try
-                    (handler msg)
+                    ((:method handler) msg)
                     (catch Exception e
                       (print-debug "Handler Exception. Got msg - " msg "\n"
                                    (with-out-str (.printStackTrace e)))))]
           (when (= :done res)
-            (remove-handler handlers path key)))))))
+            (remove-handler handlers path)))))))
 
 (defn- listener-thread
   "Thread which runs the listen-loop"
@@ -261,26 +262,27 @@
   "Returns the number of handlers in a peer"
   ([peer] (num-handlers peer @(:handlers peer)))
   ([peer sub-tree]
-     (let [sub-names (remove #(= % :handlers) (keys sub-tree))
-           num-hs (count (:handlers sub-tree))]
-       (+ num-hs (reduce (fn [sum sub-name]
-                           (+ sum (num-handlers peer (get sub-tree sub-name))))
-                         0
-                         sub-names)))))
+     (let [sub-names     (filter #(string? %) (keys sub-tree))
+           handler-count (if (:method (:handler sub-tree)) 1 0)]
+       (+ handler-count (reduce (fn [sum sub-name]
+                                  (+ sum (num-handlers peer (get sub-tree sub-name))))
+                                0
+                                sub-names)))))
 
 (defmethod print-method ::peer [peer w]
   (.write w (format "#<osc-peer: open?[%s] listening?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (if (:listen-thread peer) true false) (num-listeners peer) (num-handlers peer))))
 
 (defn client-peer
   "Returns an OSC client ready to communicate with a host on a given port.
-  Client doesn't listen."
+  Clients also listen for incoming messages (such as responses from the server
+  it communicates with."
  [host port]
  (when-not (integer? port)
    (throw (Exception. (str "port should be an integer - got: " port))))
  (when-not (string? host)
    (throw (Exception. (str "host should be a string - got:" host))))
  (let [host  (string/trim host)
-       peer  (peer)
+       peer  (peer :with-listener)
        sock  (.socket (:chan peer))
        local (.getLocalPort sock)]
    (.bind sock (InetSocketAddress. local))
@@ -292,7 +294,7 @@
      {:type ::client})))
 
 (defmethod print-method ::client [peer w]
-  (.write w (format "#<osc-client: dest-host[%s] des-port[%s] open?[%s]>"  @(:host peer) @(:port peer) @(:running? peer))))
+  (.write w (format "#<osc-client: destination[%s:%s] open?[%s]>"  @(:host peer) @(:port peer) @(:running? peer))))
 
 (defn update-peer-target
   "Update the target address of an OSC client so future calls to osc-send
@@ -336,7 +338,7 @@
       {:type ::server})))
 
 (defmethod print-method ::server [peer w]
-  (.write w (format "#<osc-server: n-listeners[%s] n-handlers[%s] open?[%s]>" (num-listeners peer) (num-handlers peer) @(:running? peer))))
+  (.write w (format "#<osc-server: n-listeners[%s] n-handlers[%s] port[%s] open?[%s]>"  (num-listeners peer) (num-handlers peer) @(:port peer) @(:running? peer))))
 
 (defn close-peer
   "Close a peer, also works for clients and servers."
@@ -378,8 +380,9 @@
     path))
 
 (defn peer-handle
-  "Register a new handler with peer on path with key."
-  [peer path handler key]
+  "Register a new handler with peer on path. Replaces previous handler if one
+  already exists."
+  [peer path handler]
   (let [path (normalize-path path)]
     (when-not (string? path)
       (throw (IllegalArgumentException. (str "OSC handle path should be a string"))))
@@ -391,18 +394,17 @@
       (throw (IllegalArgumentException. (str "OSC handle needs to start with /"))))
     (let [handlers (:handlers peer)
           path-parts (split-path path)
-
-          phandlers (:handlers (get-in @handlers path-parts {:handlers {}}))]
-      (dosync (alter handlers assoc-in (conj (vec path-parts) :handlers) (assoc phandlers key handler))))))
+          path-parts (concat path-parts [:handler])]
+      (dosync (alter handlers assoc-in path-parts {:method handler})))))
 
 (defn peer-recv
   "Register a one-shot handler with peer with specified timeout. If timeout is
   nil then timeout is ignored."
-  [peer path timeout]
+  [peer path handler timeout]
   (let [path (normalize-path path)
         p (promise)]
     (peer-handle peer path (fn [msg]
-                            (deliver p msg)
+                            (deliver p (handler msg))
                             :done))
     (let [res (try
                 (if timeout
@@ -412,14 +414,6 @@
                   nil))]
       res)))
 
-(defn peer-rm-handlers
-  "Remove handlers from peer associated with path."
-  [peer path]
-  (let [path (normalize-path path)
-        handlers (:handlers peer)
-        path-parts (split-path path)]
-    (dosync
-     (alter handlers assoc-in (conj (vec path-parts) :handlers) {}))))
 
 (defn peer-rm-all-handlers
   "Remove all handlers from peer recursively down from path"
@@ -434,7 +428,7 @@
 
 (defn peer-rm-handler
   "Remove handler from peer with specific key associated with path"
-  [peer path key]
+  [peer path]
   (let [path (normalize-path path)
         handlers (:handlers peer)]
-    (remove-handler handlers path key)))
+    (remove-handler handlers path)))

@@ -269,9 +269,10 @@
 
 
 (defn- sub-container-names
-  "Return a list of sub-containers names in the current handler (sub)tree"
+  "Return a list of sub-containers names in the current handler (sub)tree. These
+  are all the keys which are strings."
   [handler-tree]
-  (remove #(= % :handlers) (keys handler-tree)))
+  (filter #(string? %) (keys handler-tree)))
 
 (defn- children
   "Returns a seq of handler-tree's child [name sub-tree] pairs"
@@ -283,7 +284,7 @@
 (defn- find-all-pattern-matches
   [pattern-parts sub-tree path]
   (if (empty? pattern-parts)
-    {path (:handlers sub-tree)}
+    {path (:handler sub-tree)}
     (if (and (empty? pattern-parts)
              (not (empty? (sub-container-names sub-tree))))
       nil
@@ -313,17 +314,20 @@
         matches (remove nil? (flatten [matches]))]
     (unfold-matches matches)))
 
-(defn- basic-match-handlers
-  "Basic non-pattern-matching retrieval of handlers. Simply look up handlers
-  based on direct match with path. Returns a list of [path key handler] matches."
+(defn- basic-match-handler
+  "Basic non-pattern-matching retrieval of handler. Simply look up handler
+  based on direct match with path. Returns a list of [path handler] match (or
+  the empty list if no match found)."
   [path handlers]
   (let [path-parts (split-path path)
-        handler-maps (:handlers (get-in handlers path-parts {:handlers {}}))]
-    (map (fn [[key handler]] [path key handler]) handler-maps)))
+        handler-map (:handler (get-in handlers path-parts {}))]
+    (if-let [method handler-map]
+      [[path method]]
+      [])))
 
 (defn matching-handlers
   "Returns a seq of matching handlers in the form [path key handler] "
   [path handlers]
   (if (contains-pattern-match-chars? path)
     (pattern-match-handlers path handlers)
-    (basic-match-handlers path handlers)))
+    (basic-match-handler path handlers)))
