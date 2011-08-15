@@ -181,7 +181,7 @@ When constructing bundles, if you specify the timestamp with a Long, you can sam
 
 The basic matchers are:
 
-* `*` Matches 0 or more arbitrary chars (`osc-clj`'s implements this in a non-greedy way)
+* `*` Matches 0 or more arbitrary chars (`osc-clj` implements this in a non-greedy way)
 * `?` Matches 1 arbitrary char
 * `[abc]` Matches 1 char: either a, b or c
 * `[!abc]` Matches 1 char: not a,b or c
@@ -191,7 +191,7 @@ The basic matchers are:
 
 The matchers may also be combined:
 
-    `/foo/{bar,baz}/*/*quux?/[abc]def[!h]/phasor[0-9]/
+    /foo/{bar,baz}/*/*quux?/[abc]def[!h]/phasor[0-9]/
 
 There is no guarantee on the order of fn triggering.
 
@@ -205,7 +205,7 @@ On creation of a server, you may specify an option tag:
 
     (def server (osc-server 9800 "My OSC Server"))
 
-The arg `My OSC Server` is then used to register your server with zeroconf. In order to use zeroconf you must turn it on:
+The string `My OSC Server` is then used to register your server with zeroconf. In order to use zeroconf you must turn it on:
 
     (zero-conf-on)
 
@@ -217,7 +217,7 @@ You should now see your server with clients that speak zeroconf. It is known tha
 
 Include in your project.clj like so:
 
-  [overtone/osc-clj "0.4.1"]
+    [overtone/osc-clj "0.4.1"]
 
 ### Source Repository
 Downloads and the source repository can be found on GitHub:
