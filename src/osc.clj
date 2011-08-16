@@ -16,7 +16,8 @@
 (defn osc-listen
   "Attach a generic listener function that will be called with every incoming
   osc message. An optional key allows you to specifically refer to this listener
-  at a later point in time
+  at a later point in time. If no key is passed, the listener itself will also
+  serve as the key.
 
   (osc-listen s (fn [msg] (println \"listener: \" msg)) :foo)."
   ([server listener] (osc-listen server listener listener))
@@ -26,8 +27,9 @@
      server))
 
 (defn osc-listeners
-  "Return a seq of all registered listeners
-  (osc-listeners s) ;=> (:foo)"
+  "Return a seq of the keys of all registered listeners. This may be the
+  listener fns themselves if no key was explicitly specified when the listener
+  was registered."
   [server]
   (keys @(:listeners server)))
 
@@ -59,6 +61,13 @@
   [server path handler]
   (peer-handle server path handler)
   server)
+
+(defn osc-handlers
+  "Returns a seq of all the paths containing a handler for the server. If a
+  path is specified, the result will be scoped within that subtree."
+  ([server] (osc-handlers server "/"))
+  ([server path]
+     (peer-handler-paths server path)))
 
 (defn osc-rm-handler
   "Remove the handler at the specified path.
