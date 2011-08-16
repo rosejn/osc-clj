@@ -168,10 +168,10 @@
   "Remove the handler associated with the specified path within the ref
   handlers."
   [handlers path]
-  (let [path-parts (split-path path)
-        path-parts (concat path-parts [:handler])]
-    (dosync
-     (alter handlers assoc-in path-parts {}))))
+  (dosync
+   (let [path-parts (split-path path)
+         subtree (get-in @handlers path-parts)]
+     (alter handlers assoc-in path-parts (dissoc subtree :handler)))))
 
 (defn- mk-default-listener
   "Return a fn which dispatches the passed in message to all specified handlers with
@@ -258,16 +258,30 @@
   [peer]
   (count (keys @(:listeners peer))))
 
+(defn- peer-handler-paths*
+  "Returns the number of handlers in a peer"
+  [sub-tree path]
+  (let [sub-names     (filter #(string? %) (keys sub-tree))
+        curr (if (:method (:handler sub-tree)) [path] [])]
+    (conj curr (reduce (fn [sum sub-name]
+                               (conj sum (peer-handler-paths* (get sub-tree sub-name) (str path "/" sub-name))))
+                                []
+                                sub-names))))
+
+(defn peer-handler-paths
+  "Returns the number of handlers in a peer"
+  ([peer] (peer-handler-paths peer "/"))
+  ([peer path]
+     (let [path (split-path path)
+           handlers @(:handlers peer)
+           handlers (get-in handlers path)]
+       (flatten (peer-handler-paths* handlers (apply str (interpose "/" path)))))))
+
 (defn- num-handlers
   "Returns the number of handlers in a peer"
-  ([peer] (num-handlers peer @(:handlers peer)))
-  ([peer sub-tree]
-     (let [sub-names     (filter #(string? %) (keys sub-tree))
-           handler-count (if (:method (:handler sub-tree)) 1 0)]
-       (+ handler-count (reduce (fn [sum sub-name]
-                                  (+ sum (num-handlers peer (get sub-tree sub-name))))
-                                0
-                                sub-names)))))
+  ([peer] (num-handlers peer "/"))
+  ([peer path]
+     (count (peer-handler-paths peer path))))
 
 (defmethod print-method ::peer [peer w]
   (.write w (format "#<osc-peer: open?[%s] listening?[%s] n-listeners[%s] n-handlers[%s]>" @(:running? peer) (if (:listen-thread peer) true false) (num-listeners peer) (num-handlers peer))))
@@ -424,7 +438,7 @@
     (dosync
      (if (empty? path-parts)
        (ref-set handlers {})
-       (alter  handlers path-parts {})))))
+       (alter  handlers assoc-in path-parts {})))))
 
 (defn peer-rm-handler
   "Remove handler from peer with specific key associated with path"
