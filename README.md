@@ -33,7 +33,7 @@
                  d88""88b 88K      d88P"          d88P"    888 "888
                  888  888 "Y8888b. 888     888888 888      888  888
                  Y88..88P      X88 Y88b.          Y88b.    888  888
-                  "Y88P"   88888P'  "Y8888P        "Y8888P 888  888
+                  "y88p"   88888P'  "Y8888P        "Y8888P 888  888
                                                                 888
                                                                d88P
                                                              888P"
@@ -215,9 +215,9 @@ You should now see your server with clients that speak zeroconf. It is known tha
 
 ## Project Info:
 
-Include in your `project.clj` like so:
+Include in your `project.clj like so:
 
-    [overtone/osc-clj "0.4.1"]
+    [overtone/osc-clj "0.5.0"]
 
 ### Source Repository
 Downloads and the source repository can be found on GitHub:
