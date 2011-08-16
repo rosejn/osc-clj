@@ -59,8 +59,8 @@ http://opensoundcontrol.org/spec-1_0
 
     ; Register a handler function for the /test OSC address
     ; The handler takes a message map with the following keys:
-    ;   {:src-host, :src-port, :path, :type-tag, :args}
-    (osc-handle server "/test" (fn [msg] (println "MSG: " (:args msg))) :my-handler)
+    ;   [:src-host, :src-port, :path, :type-tag, :args]
+    (osc-handle server "/test" (fn [msg] (println "MSG: " msg)))
 
     ; send it some messages
     (doseq [val (range 10)]
@@ -69,7 +69,7 @@ http://opensoundcontrol.org/spec-1_0
     (Thread/sleep 1000)
 
     ;remove handler
-    (osc-rm-handler server "/test" :my-handler)
+    (osc-rm-handler server "/test")
 
     ; stop listening and deallocate resources
     (osc-close client)
@@ -136,17 +136,17 @@ To remove the listener simply call:
 
 #### OSC Method Handlers
 
-Handlers are registered with an OSC path such as /foo/bar - they are only triggered if the path of the incoming OSC message matches the registered path.
+Handlers are registered with an OSC path such as /foo/bar - they are only triggered if the path of the incoming OSC message matches the registered path. Only one handler may be registered with any given path.
 
 To register a handler for the path "/foo/bar" do the following:
 
-    (osc-handle s "/foo/bar" (fn [msg] (println "Handler for /foo/bar: " msg)) :foo)
+    (osc-handle s "/foo/bar" (fn [msg] (println "Handler for /foo/bar: " msg)))
 
 This will only print out received messages that match the path "/foo/bar". To remove call:
 
-    (osc-rm-handler s "/foo/bar" :foo)
+    (osc-rm-handler s "/foo/bar")
 
-`osc-clj` also supplies the fns `osc-rm-handlers` which will remove all the server's handlers on the specified path and `osc-rm-all-handlers` which will remove all the servers handlers within the path and below in the hierarchy (i.e. `(osc-rm-all-handlers server "/foo")` will remove all handlers registered at /foo and any below i.e. /foo/bar /foo/bar/baz etc. Passing no path to `osc-rm-all-handlers` will remove *all* handlers on the server.
+`osc-clj` also supplies the fn `osc-rm-all-handlers` which will remove all the servers handlers within the path and below in the hierarchy (i.e. `(osc-rm-all-handlers server "/foo")` will remove all handlers registered at /foo and any below i.e. /foo/bar /foo/bar/baz etc. Passing no path to `osc-rm-all-handlers` will remove *all* handlers on the server.
 
 ### OSC Bundles
 
@@ -215,7 +215,7 @@ You should now see your server with clients that speak zeroconf. It is known tha
 
 ## Project Info:
 
-Include in your project.clj like so:
+Include in your `project.clj` like so:
 
     [overtone/osc-clj "0.4.1"]
 
@@ -224,8 +224,10 @@ Downloads and the source repository can be found on GitHub:
 
   http://github.com/overtone/osc-clj
 
-Eventually there will be more documentation for this library. In the
-meantime we recommend you take a look at fns in the osc namespace and also see the library in use within the context of Project Overtone, located here:
+
+### Example Usage
+
+For an example of this library in use within the check out Overtone, located here:
 
   http://github.com/overtone/overtone
 
