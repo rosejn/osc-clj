@@ -49,7 +49,7 @@ http://opensoundcontrol.org/spec-1_0
 
 ## Quick Start
 
-    (use 'osc)
+    (use 'overtone.osc)
 
     (def PORT 4242)
 
