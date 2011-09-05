@@ -1,6 +1,6 @@
-(ns osc.pattern
+(ns overtone.osc.pattern
   (:require [clojure.string :as string])
-  (:use [osc.util]))
+  (:use [overtone.osc.util]))
 
 ;; Pattern-matched retrievel of handlers. Implements the following pattern
 ;; matching rules from the Open Sound Control Spec 1.0:

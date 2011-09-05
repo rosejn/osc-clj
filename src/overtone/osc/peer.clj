@@ -1,4 +1,4 @@
-(ns osc.peer
+(ns overtone.osc.peer
   (:import
    (java.net InetSocketAddress DatagramSocket DatagramPacket)
    (java.util.concurrent TimeUnit TimeoutException PriorityBlockingQueue)
@@ -8,10 +8,10 @@
   (:require [at-at :as at-at]
             [clojure.string :as string])
   (:use [clojure.set :as set]
-        [osc.util]
-        [osc.decode :only [osc-decode-packet]]
-        [osc.encode :only [osc-encode-msg osc-encode-bundle]]
-        [osc.pattern :only [matching-handlers]]))
+        [overtone.osc.util]
+        [overtone.osc.decode :only [osc-decode-packet]]
+        [overtone.osc.encode :only [osc-encode-msg osc-encode-bundle]]
+        [overtone.osc.pattern :only [matching-handlers]]))
 
 (def zero-conf* (agent nil))
 (def zero-conf-services* (atom {}))

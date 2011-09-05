@@ -1,6 +1,6 @@
-(ns osc.decode
+(ns overtone.osc.decode
   (:import [org.apache.commons.net.ntp TimeStamp])
-  (:use [osc.util]))
+  (:use [overtone.osc.util]))
 
 (defn osc-align
   "Jump the current position to a 4 byte boundary for OSC compatible alignment."

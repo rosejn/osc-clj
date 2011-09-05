@@ -1,6 +1,6 @@
-(ns osc
-  (:use [osc.util]
-        [osc.peer]))
+(ns overtone.osc
+  (:use [overtone.osc.util]
+        [overtone.osc.peer]))
 
 ;; We use binding to *osc-msg-bundle* to bundle messages
 ;; and send combined with an OSC timestamp.

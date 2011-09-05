@@ -1,6 +1,6 @@
-(ns osc.encode
+(ns overtone.osc.encode
   (:import [org.apache.commons.net.ntp TimeStamp])
-  (use [osc.util]))
+  (use [overtone.osc.util]))
 
 (defn osc-pad
   "Add 0-3 null bytes to make buf position 32-bit aligned."

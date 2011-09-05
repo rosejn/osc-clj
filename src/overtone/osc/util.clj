@@ -1,4 +1,4 @@
-(ns osc.util
+(ns overtone.osc.util
   (:require [clojure.string :as str]))
 
 (defn print-debug [& msgs]
