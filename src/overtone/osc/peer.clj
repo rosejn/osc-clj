@@ -1,20 +1,20 @@
 (ns overtone.osc.peer
-  (:import
-   (java.net InetSocketAddress DatagramSocket DatagramPacket)
-   (java.util.concurrent TimeUnit TimeoutException PriorityBlockingQueue)
-   (java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException)
-   (java.nio ByteBuffer)
-   (javax.jmdns JmDNS ServiceListener ServiceInfo))
-  (:require [at-at :as at-at]
-            [clojure.string :as string])
+  (:import [java.net InetSocketAddress DatagramSocket DatagramPacket]
+           [java.util.concurrent TimeUnit TimeoutException PriorityBlockingQueue]
+           [java.nio.channels DatagramChannel AsynchronousCloseException ClosedChannelException]
+           [java.nio ByteBuffer]
+           [javax.jmdns JmDNS ServiceListener ServiceInfo])
   (:use [clojure.set :as set]
         [overtone.osc.util]
         [overtone.osc.decode :only [osc-decode-packet]]
         [overtone.osc.encode :only [osc-encode-msg osc-encode-bundle]]
-        [overtone.osc.pattern :only [matching-handlers]]))
+        [overtone.osc.pattern :only [matching-handlers]])
+  (:require [overtone.at-at :as at-at]
+            [clojure.string :as string]))
 
 (def zero-conf* (agent nil))
 (def zero-conf-services* (atom {}))
+(defonce dispatch-pool (at-at/mk-pool))
 
 (defn turn-zero-conf-on
   "Turn zeroconf on and register all services in zero-conf-services* if any."
@@ -133,7 +133,8 @@
             #(doseq [item (:items bundle)]
                (if (osc-msg? item)
                  (dispatch-msg all-listeners src item)
-                 (dispatch-bundle all-listeners src item)))))
+                 (dispatch-bundle all-listeners src item)))
+            dispatch-pool))
 
 (defn- listen-loop
   "Loop for the listen thread to execute in order to receive and handle OSC
