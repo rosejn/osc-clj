@@ -86,8 +86,13 @@
   (rest (str/split path #"/")))
 
 (defn mk-osc-bundle
-  "Create an osc bundle"
+  "Create an osc bundle. Throws exceptions if the timestamp and items aren't the
+  correct types (number and list respectively)."
   [timestamp items]
+  (when-not (number? timestamp)
+    (throw (IllegalArgumentException. (str "OSC bundle timestamp param needs to be a number. Got: " (type timestamp) " - " timestamp))))
+  (when-not (sequential? items)
+    (throw (IllegalArgumentException. (str "OSC bundle items param needs to be a list. Got: " (type items) " - " items))))
   (with-meta {:timestamp timestamp
               :items items}
              {:type :osc-bundle}))

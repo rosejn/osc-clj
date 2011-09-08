@@ -24,9 +24,12 @@
   (osc-pad buf))
 
 (defn encode-timetag
-  "Encode timetag into buf. Timestamp defaults now if not specifically passed."
+  "Encode timetag into buf. Timestamp defaults to (now) if not specifically
+  passed. Throws exception if timestamp isn't a number."
   ([buf] (encode-timetag buf OSC-TIMETAG-NOW))
   ([buf timestamp]
+     (when-not (number? timestamp)
+       (throw (IllegalArgumentException. (str "OSC bundle timestamp needs to be a number. Got: " (type timestamp) " - " timestamp))))
      (if (= timestamp OSC-TIMETAG-NOW)
        (doto buf (.putInt 0) (.putInt 1))
        (let [ntp-timestamp (TimeStamp/getNtpTime (long timestamp))
