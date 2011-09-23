@@ -217,7 +217,7 @@ You should now see your server with clients that speak zeroconf. It is known tha
 
 Include in your `project.clj like so:
 
-    [overtone/osc-clj "0.5.0"]
+    [overtone/osc-clj "0.7.1"]
 
 ### Source Repository
 Downloads and the source repository can be found on GitHub:
