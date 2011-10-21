@@ -132,8 +132,7 @@
        res#)))
 
 (defn osc-client
- "Returns an OSC client ready to communicate with a host on a given port.
- Use :protocol in the options map to \"tcp\" if you don't want \"udp\"."
+ "Returns an OSC client ready to communicate with a host on a given port via UDP"
   [host port]
   (client-peer host port))
 
