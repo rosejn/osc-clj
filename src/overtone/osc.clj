@@ -13,6 +13,11 @@
     (swap! *osc-msg-bundle* #(conj %1 msg))
     (peer-send-msg peer msg)))
 
+(defn- osc-reply-msg
+  "Send OSC msg to peer. as a reply"
+  [peer msg msg-to-reply-to]
+  (peer-reply-msg peer msg msg-to-reply-to))
+
 (defn osc-listen
   "Attach a generic listener function that will be called with every incoming
   osc message. An optional key allows you to specifically refer to this listener
@@ -99,6 +104,13 @@
   [server path handler & [timeout]]
   (peer-recv server path handler timeout)
   server)
+
+(defn osc-reply
+  "Similar to osc-send except ignores the peer's target address and instead
+  sends the OSC message to the sender of msg-to-reply-to. It is not currently
+  possible to implicitly build OSC bundles as a reply to an OSC msg."
+  [peer msg-to-reply-to path & args]
+  (osc-reply-msg peer (apply mk-osc-msg path (osc-type-tag args) args) msg-to-reply-to))
 
 (defn osc-send
   "Creates an OSC message and either sends it to the server immediately

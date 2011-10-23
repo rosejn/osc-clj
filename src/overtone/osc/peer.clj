@@ -85,13 +85,19 @@
   "Loop for the send thread to execute in order to send OSC messages externally.
   Reads messages from send-q, encodes them using send-buf and sends them out
   using the peer's send-fn extracted from send-q (send-q is expected to contain a
-  sequence of [peer message]). "
+  sequence of [peer message]). If msg contains the key :override-destination it
+  overrides the :addr key of peer to the new address for the delivery of the
+  specific message."
   [running? send-q send-buf]
   (while @running?
     (if-let [res (.poll send-q
                         SEND-LOOP-TIMEOUT
                         TimeUnit/MILLISECONDS)]
-      (let [[peer m] res]
+      (let [[peer m] res
+            new-dest (:override-destination m)
+            peer     (if new-dest
+                       (assoc peer :addr (atom new-dest))
+                       peer)]
         (cond
           (osc-msg? m) (osc-encode-msg send-buf m)
           (osc-bundle? m) (osc-encode-bundle send-buf m))
@@ -101,9 +107,8 @@
           (catch Exception e
             (print-debug "Exception in send-loop: " e  "\nstacktrace: "
                          (.printStackTrace e))))
-
-        (.clear send-buf))) ; clear resets everything
-    ))
+        ;; clear resets everything
+        (.clear send-buf)))))
 
 (defn- dispatch-msg
   "Send msg to all listeners. all-listeners is a map containing the keys
@@ -210,49 +215,72 @@
   added to a peer on creation. See client-peer and server-peer."
   [peer send-buf]
   (let [{:keys [chan addr]} peer]
+    (when-not @addr
+      (throw (Exception. (str "No address to send message to."))))
     (.send chan send-buf @addr)))
 
-(defn peer
-  "Creat a generic peer which is capable of both sending and receiving messages
-  on DatagramChannel :chan. Creates a thread for sending packets out using the
-  fn in :send-fn (defaults to chan-send). Creates a thread for sending packets
-  out by spawning a sending thread which will pull OSC message maps from the
-  :send-q, encode them to binary and send them using the fn in :send-fn
-  (defaults to chan-send). For chan-send to work, the chan's socked needs to be
-  bound (see peer-client). Allowing chan-send to be modified allows for
-  libraries such as Overtone to not actually transmit OSC packets out over the
-  channel, but to send them via a different transport mechanism.
+(defn bind-chan!
+  "Bind a channel's datagram socket to its local port or the specified one if
+  explicitly passed in."
+  ([chan]
+     (let [sock       (.socket chan)
+           local-port (.getLocalPort sock)]
+       (.bind sock (InetSocketAddress. local-port))))
+  ([chan port]
+     (let [sock (.socket chan)]
+       (.bind sock (InetSocketAddress. port)))))
 
+(defn peer
+  "Create a generic peer which is capable of both sending and receiving/handling
+  OSC messages via a DatagramChannel (UDP).
+
+  default opts -> {:no-binding false, :listen false}
+
+  Sending:
+  Creates a thread for sending packets out which which will pull OSC message
+  maps from the :send-q, encode them to binary and send them using the fn in
+  :send-fn (defaults to chan-send). Allowing the :send-fn
+  to be modified allows for libraries such as Overtone to not actually transmit
+  OSC packets out over the channel, but to send them via a different transport
+  mechanism.
+
+  Receiving/Handling:
   If passed an optional param listen? will also start a thread listening for
-  incoming packets on chan. peers have listeners and handlers registered to
+  incoming packets. Peers may have listeners and/or handlers registered to
   recieve incoming messages.  A listener is sent every message received, and
-  handlers are dispatched by OSC node (a.k.a. path)."
-  [& [listen?]]
-  (let [chan (DatagramChannel/open)
-        rcv-buf (ByteBuffer/allocate BUFFER-SIZE)
-        send-buf (ByteBuffer/allocate BUFFER-SIZE)
-        send-q (PriorityBlockingQueue. OSC-SEND-Q-SIZE (comparator (fn [a b] (< (:timestamp (second a)) (:timestamp (second b))))))
-        running? (ref true)
-        handlers (ref {})
-        default-listener (mk-default-listener handlers)
-        listeners (ref {})
-        send-thread (sender-thread running? send-q send-buf)
-        listen-thread (when listen?
-                        (listener-thread chan rcv-buf running? {:listeners listeners
-                                                                :default default-listener}))]
-    (.configureBlocking chan true)
-    (with-meta
-      {:chan chan
-       :rcv-buf rcv-buf
-       :send-q send-q
-       :running? running?
-       :send-thread send-thread
-       :listen-thread listen-thread
-       :default-listener default-listener
-       :listeners listeners
-       :handlers handlers
-       :send-fn chan-send}
-      {:type ::peer})))
+  handlers are dispatched by OSC node (a.k.a. path).
+
+  You must explicitly bind the peer's :chan to receive incoming messages."
+  ([] (peer false))
+  ([listen?]
+     (let [chan             (DatagramChannel/open)
+           rcv-buf          (ByteBuffer/allocate BUFFER-SIZE)
+           send-buf         (ByteBuffer/allocate BUFFER-SIZE)
+           send-q           (PriorityBlockingQueue. OSC-SEND-Q-SIZE
+                                                    (comparator (fn [a b]
+                                                                  (< (:timestamp (second a))
+                                                                     (:timestamp (second b))))))
+           running?         (ref true)
+           handlers         (ref {})
+           default-listener (mk-default-listener handlers)
+           listeners        (ref {})
+           send-thread      (sender-thread running? send-q send-buf)
+           listen-thread    (when listen?
+                              (listener-thread chan rcv-buf running? {:listeners listeners
+                                                                      :default default-listener}))]
+       (.configureBlocking chan true)
+       (with-meta
+         {:chan chan
+          :rcv-buf rcv-buf
+          :send-q send-q
+          :running? running?
+          :send-thread send-thread
+          :listen-thread listen-thread
+          :default-listener default-listener
+          :listeners listeners
+          :handlers handlers
+          :send-fn chan-send}
+         {:type ::peer}))))
 
 (defn- num-listeners
   "Returns the number of listeners in a peer"
@@ -297,10 +325,9 @@
  (when-not (string? host)
    (throw (Exception. (str "host should be a string - got:" host))))
  (let [host  (string/trim host)
-       peer  (peer :with-listener)
-       sock  (.socket (:chan peer))
-       local (.getLocalPort sock)]
-   (.bind sock (InetSocketAddress. local))
+       peer (peer :with-listener)
+       chan (:chan peer)]
+   (bind-chan! chan)
    (with-meta
      (assoc peer
        :host (ref host)
@@ -339,17 +366,15 @@
   (when-not (string? zero-conf-name)
     (throw (Exception. (str "zero-conf-name should be a string - got:" zero-conf-name))))
   (let [peer (peer :with-listener)
-        sock (.socket (:chan peer))]
-
-    (.bind sock (InetSocketAddress. port))
+        chan (:chan peer)]
+    (bind-chan! chan port)
     (register-zero-conf-service zero-conf-name port)
-
     (with-meta
       (assoc peer
-                 :host (ref nil)
-                 :port (ref port)
-                 :addr (ref nil)
-                 :zero-conf-name zero-conf-name)
+        :host (ref nil)
+        :port (ref port)
+        :addr (ref nil)
+        :zero-conf-name zero-conf-name)
       {:type ::server})))
 
 (defmethod print-method ::server [peer w]
@@ -385,6 +410,16 @@
   (when @osc-debug*
     (print-debug "osc-send-msg: " msg))
   (.put (:send-q peer) [peer (assoc msg :timestamp 0)]))
+
+(defn peer-reply-msg
+  "Send OSC msg to peer"
+  [peer msg msg-to-reply-to]
+  (let [host (:src-host msg-to-reply-to)
+        port (:src-port msg-to-reply-to)
+        addr (InetSocketAddress. host port)]
+    (when @osc-debug*
+      (print-debug "osc-reply-msg: " msg " to: " host " : " port))
+    (.put (:send-q peer) [peer (assoc msg :timestamp 0 :override-destination addr)])))
 
 (defn- normalize-path
   "Clean up path.
