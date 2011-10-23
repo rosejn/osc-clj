@@ -25,33 +25,33 @@
   serve as the key.
 
   (osc-listen s (fn [msg] (println \"listener: \" msg)) :foo)."
-  ([server listener] (osc-listen server listener listener))
-  ([server listener key]
+  ([peer listener] (osc-listen peer listener listener))
+  ([peer listener key]
      (dosync
-      (alter (:listeners server) assoc key listener))
-     server))
+      (alter (:listeners peer) assoc key listener))
+     peer))
 
 (defn osc-listeners
   "Return a seq of the keys of all registered listeners. This may be the
   listener fns themselves if no key was explicitly specified when the listener
   was registered."
-  [server]
-  (keys @(:listeners server)))
+  [peer]
+  (keys @(:listeners peer)))
 
 (defn osc-rm-listener
   "Remove the generic listener associated with the specific key
   (osc-rm-listener s :foo)"
-  [server key]
+  [peer key]
   (dosync
-   (alter (:listeners server) dissoc key))
-  server)
+   (alter (:listeners peer) dissoc key))
+  peer)
 
 (defn osc-rm-all-listeners
   "Remove all generic listeners associated with server"
-  [server]
+  [peer]
   (dosync
-   (ref-set (:listeners server) {}))
-  server)
+   (ref-set (:listeners peer) {}))
+  peer)
 
 (defn osc-handle
   "Add a handle fn (a method in OSC parlance) to the specified OSC path
@@ -63,23 +63,23 @@
 
   Will override and remove any handler already associated with the supplied
   path. If the handler-fn returns :done it will automatically remove itself."
-  [server path handler]
-  (peer-handle server path handler)
-  server)
+  [peer path handler]
+  (peer-handle server path  handler)
+  peer)
 
 (defn osc-handlers
   "Returns a seq of all the paths containing a handler for the server. If a
   path is specified, the result will be scoped within that subtree."
-  ([server] (osc-handlers server "/"))
-  ([server path]
-     (peer-handler-paths server path)))
+  ([peer] (osc-handlers peer "/"))
+  ([peer path]
+     (peer-handler-paths peer path)))
 
 (defn osc-rm-handler
   "Remove the handler at the specified path.
   specific handler (if found)"
-  [server path]
-  (peer-rm-handler server path)
-  server)
+  [peer path]
+  (peer-rm-handler peer path)
+  peer)
 
 (defn osc-rm-all-handlers
   "Remove all registered handlers for the supplied path (defaulting to /)
@@ -88,10 +88,10 @@
   have been registered for both /foo/bar and /foo/bar/baz and
   osc-rm-all-handlers is called with /foo/bar, then the handlers associated
   with both /foo/bar and /foo/bar/baz will be removed."
-  ([server] (osc-rm-all-handlers server "/"))
-  ([server path]
-     (peer-rm-all-handlers server path)
-     server))
+  ([peer] (osc-rm-all-handlers peer "/"))
+  ([peer path]
+     (peer-rm-all-handlers peer path)
+     peer))
 
 (defn osc-recv
   "Register a one-shot handler which will remove itself once called. If a
@@ -101,9 +101,9 @@
 
   Will override and remove any handler already associated with the supplied
   path."
-  [server path handler & [timeout]]
-  (peer-recv server path handler timeout)
-  server)
+  [peer path handler & [timeout]]
+  (peer-recv peer path handler timeout)
+  peer)
 
 (defn osc-reply
   "Similar to osc-send except ignores the peer's target address and instead
