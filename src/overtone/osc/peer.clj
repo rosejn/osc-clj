@@ -336,7 +336,7 @@
      {:type ::client})))
 
 (defmethod print-method ::client [peer w]
-  (.write w (format "#<osc-client: destination[%s:%s] open?[%s]>"  @(:host peer) @(:port peer) @(:running? peer))))
+  (.write w (format "#<osc-client: destination[%s:%s] open?[%s] n-listeners[%s] n-handlers[%s]>"  @(:host peer) @(:port peer) @(:running? peer) (num-listeners peer) (num-handlers peer))))
 
 (defn update-peer-target
   "Update the target address of an OSC client so future calls to osc-send
