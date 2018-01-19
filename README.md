@@ -46,6 +46,12 @@ A full-featured UDP-based OSC communication library created for Project Overtone
 
 http://opensoundcontrol.org/spec-1_0
 
+## How To Install:
+
+Include in your `project.clj like so:
+
+    [overtone/osc-clj "0.9.0"]
+
 
 ## Quick Start
 
@@ -212,12 +218,7 @@ The string `My OSC Server` is then used to register your server with zeroconf. I
 You should now see your server with clients that speak zeroconf. It is known that zero-conf can eat up a lot of cpu time - especially on chatty networks. It is therefore recommended to switch it off once you have configured and connected your client:
 
     (zero-conf-off)
-
-## Project Info:
-
-Include in your `project.clj like so:
-
-    [overtone/osc-clj "0.7.1"]
+    
 
 ### Source Repository
 Downloads and the source repository can be found on GitHub:
